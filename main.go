@@ -1,11 +1,15 @@
 package main
 
 import (
+	"bytes"
+	"encoding/binary"
+	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
 	"transbin/codec"
+	"transbin/utils"
 )
 
 type NStruct struct {
@@ -49,16 +53,69 @@ func main() {
 	var encodedFull []byte
 	c, _ := codec.NewCodec()
 
+	utils.Reporting = true
+
 	encodedResult := c.EncodeFull(toEncode)
+
+	fmt.Printf("got encoded[%d]\n",len(encodedResult))
 
 	decodedBack := TestStruct{}
 
-	//codec.Reporting = true
-
 	c.Decode(&decodedBack, encodedResult)
-	//return
 
-	//return
+	fmt.Printf("Result of decoded Value field %f\n",decodedBack.NestedStruct.Floa)
+
+	return
+
+	var x []byte
+	buff := bytes.NewBuffer(x)
+
+	coder := gob.NewEncoder(buff)
+	var gobResult []byte
+
+	var gobFullResult []byte
+
+	PrintBenchmark("gob full encode", testing.Benchmark(func(b *testing.B) {
+
+		for i := 0; i < b.N; i++ {
+			coder.Encode(toEncode)
+			if (i == 0) {
+				gobFullResult = buff.Bytes()
+			}
+			gobResult = buff.Bytes()
+			buff.Reset()
+		}
+
+		b.ReportAllocs()
+		b.ReportMetric(float64(len(gobResult)), "encoded_size")
+	}))
+
+
+	dbuf := codec.NewDecodeBuffer(binary.BigEndian)
+	dbuf.Init(gobFullResult)
+
+	decoder := gob.NewDecoder(dbuf)
+
+	PrintBenchmark("gob decode", testing.Benchmark(func(b *testing.B) {
+
+		dRes := TestStruct{}
+
+		for i := 0; i < b.N; i++ {
+
+			dbuf.Init(gobFullResult)
+
+			decoder.Decode(&dRes)
+
+			buff.Reset()
+		}
+
+		b.ReportAllocs()
+		b.ReportMetric(float64(dRes.NestedStruct.Floa), "encoded_size")
+	}))
+
+
+	return
+
 	PrintBenchmark("binary full encode", testing.Benchmark(func(b *testing.B) {
 
 		for i := 0; i < b.N; i++ {

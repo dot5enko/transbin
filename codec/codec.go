@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"transbin/utils"
 )
 
 type codec struct {
@@ -86,6 +87,9 @@ func (c *codec) putReference(v reflect.Value) (uint16, error) {
 }
 
 func (c *codec) cacheReflectionData(typeId uint16, t reflect.Type) error {
+
+	utils.ReportAllocs("cache reflection")
+
 	tData, ok := c.types[typeId]
 	if !ok {
 		return errors.New("unable to found a type declaration in codec")

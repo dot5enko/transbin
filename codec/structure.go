@@ -66,6 +66,8 @@ func (c *codec) registerStructure(o reflect.Value) *structDefinition {
 		c.types[structDef.Id] = &structDef
 		c.typeMap[name] = structDef.Id
 
+		c.cacheReflectionData(structDef.Id, oIndirect.Type())
+
 		return c.types[structDef.Id]
 	}
 }

@@ -1,22 +1,37 @@
 package codec
 
 import (
+	"fmt"
 	"reflect"
+	"unsafe"
 )
 
-func (c *codec) EncodeFull(obj interface{}) []byte {
-	return c.encodeInternal(obj, true)
-}
-func (c *codec) Encode(obj interface{}) []byte {
-	return c.encodeInternal(obj, false)
+type iWrapper struct {
+	iface interface{}
 }
 
-func (c *codec) encodeInternal(obj interface{}, full bool) []byte {
+func (c *codec) EncodeFull(obj interface{}) []byte {
+	return c.encodeInternal(iWrapper{obj}, true)
+}
+func (c *codec) Encode(obj interface{}) []byte {
+	return c.encodeInternal(iWrapper{obj}, false)
+}
+
+func (c *codec) encodeInternal(obj iWrapper, full bool) []byte {
 
 	c.reset()
 
-	o := reflect.Indirect(reflect.ValueOf(obj))
+	objWrapper := reflect.ValueOf(obj)
+	reflectRaw := reflect.ValueOf(obj.iface)
 
+	o := reflect.Indirect(reflectRaw)
+	var objPtr uintptr
+
+	if (reflectRaw.Kind() != reflect.Ptr) {
+		objPtr = objWrapper.Field(0).InterfaceData()[1]
+	} else {
+		objPtr = reflectRaw.Pointer()
+	}
 
 	// generate structures
 	generalStruct := c.registerStructure(o)
@@ -26,7 +41,7 @@ func (c *codec) encodeInternal(obj interface{}, full bool) []byte {
 	c.mainBuffer.PutUint16(generalStruct.Id)
 
 	// data
-	c.writeComplexFieldData(generalStruct.Id, o)
+	c.writeComplexStructure(generalStruct.Id, objPtr)
 
 	// write structure
 	if full {
@@ -44,51 +59,84 @@ func (c *codec) encodeInternal(obj interface{}, full bool) []byte {
 	return c.encodeBuffer.Bytes()
 }
 
-func (c *codec) writeSimpleFieldData(v reflect.Value) {
+func (c *codec) writeSimpleFieldData(t codecStructField,v uintptr) {
 
-	switch v.Kind() {
-	case reflect.Int32:
-		c.mainBuffer.PutInt32(v.Interface().(int32))
-	case reflect.Int:
-		c.mainBuffer.PutInt32(int32(v.Interface().(int)))
-	case reflect.Float32:
-		c.mainBuffer.PutFloat32(v.Interface().(float32))
-	case reflect.Float64:
-		c.mainBuffer.PutFloat64(v.Interface().(float64))
+	switch t.Type {
+	case uint16(reflect.Int32):
+
+		result := *(*int32)(unsafe.Pointer(v+t.Offset))
+
+		c.mainBuffer.PutInt32(result)
+
+	case uint16(reflect.Int):
+
+		result := int32(*(*int)(unsafe.Pointer(v+t.Offset)))
+
+		c.mainBuffer.PutInt32(result)
+	case uint16(reflect.Float32):
+		result := *(*float32)(unsafe.Pointer(v+t.Offset))
+		c.mainBuffer.PutFloat32(result)
+	case uint16(reflect.Float64):
+
+		result := *(*float64)(unsafe.Pointer(v+t.Offset))
+
+			fmt.Printf(" float64 : %f\n",result)
+
+		c.mainBuffer.PutFloat64(result)
 	default:
-		panic("no handler for writing simple type " + v.Kind().String())
+		panic("no handler for writing simple type ")
 	}
 }
 
-func (c *codec) writeComplexFieldData(t uint16, v reflect.Value) {
+func (c *codec) writeComplexStructure(id uint16,v uintptr) {
+	c.useType(id)
 
-	c.useType(t)
+	cf := c.types[id].Fields
 
-	cf := c.types[t].Fields
+	for i := 0; i < int(c.types[id].FieldCount); i++ {
 
-	for i := 0; i < int(c.types[t].FieldCount); i++ {
-		c.writeFieldData(cf[i], reflect.Indirect(v).Field(i))
+		// todo calc indirect uintptr
+
+		c.writeFieldData(cf[i], v)
 	}
 }
 
-func (c *codec) writeFieldData(field codecStructField, v reflect.Value) {
+func (c *codec) writeComplexFieldData(t codecStructField, v uintptr) {
+
+	c.useType(t.Type)
+
+	cf := c.types[t.Type].Fields
+
+	for i := 0; i < int(c.types[t.Type].FieldCount); i++ {
+
+		// todo calc indirect uintptr
+
+		c.writeFieldData(cf[i], v + t.Offset)
+	}
+}
+
+func (c *codec) writeFieldData(field codecStructField, v uintptr) {
+
 	if field.Type > 26 {
-		c.writeComplexFieldData(field.Type, v)
+		c.writeComplexFieldData(field, v)
 	} else if field.Type == 24 {
-		c.writeReferenceFieldData(field.Type, v)
+		c.writeReferenceFieldData(field, v)
 	} else {
-		c.writeSimpleFieldData(v)
+		c.writeSimpleFieldData(field,v)
 	}
 }
 
-func (c *codec) writeReferenceFieldData(t uint16, v reflect.Value) error {
+func (c *codec) writeReferenceFieldData(t codecStructField, v uintptr) error {
 
-	id, err := c.putReference(v)
-	if err != nil {
-		return err
-	}
+	panic("not implemented!")
 
-	c.mainBuffer.PutUint16(id)
-
-	return nil
+	//
+	//id, err := c.putReference(v)
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//c.mainBuffer.PutUint16(id)
+	//
+	//return nil
 }
