@@ -6,10 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"runtime"
 )
 
 type codec struct {
-
 	typesCount uint16
 	types      map[uint16]structDefinition
 	order      binary.ByteOrder
@@ -21,9 +21,45 @@ type codec struct {
 	usedTypes       *DynamicArray
 	encodeBuffer    *bytes.Buffer
 	structureBuffer *encode_buffer
-	decodeBuffer 	*decode_buffer
+	decodeBuffer    *decode_buffer
+	dataBuffer      struct {
+		int32val   int32
+		float32val float32
+		uint16val  uint16
+	}
 }
 
+var res, firstRun runtime.MemStats
+var reports int
+
+const allocsPerRun int = 3
+const statFormat string = "%4d %8d %25s\n"
+
+//var prevMallocs, curMallocs,mallocs uint64
+
+func ReportAllocs(label string) {
+
+	runtime.ReadMemStats(&res)
+
+	if reports == 0 {
+		firstRun = res
+	}
+
+	//prevMallocs = prev.Mallocs - uint64(allocsPerRun*(reports-1))
+	//
+	//if prevMallocs < 0 {
+	//	prevMallocs = 0
+	//} else if prevMallocs > 1000000 {
+	//	prevMallocs = 0
+	//}
+	//
+	//curMallocs = res.Mallocs - uint64(allocsPerRun*reports)
+	//mallocs = curMallocs - prevMallocs
+
+	fmt.Printf(statFormat, res.Mallocs-uint64(allocsPerRun*reports)-firstRun.Mallocs, res.Alloc-firstRun.Alloc, label)
+
+	reports++
+}
 
 func NewCodec() (*codec, error) {
 	result := &codec{}
@@ -36,10 +72,10 @@ func NewCodec() (*codec, error) {
 	result.typeMap = make(map[string]uint16)
 
 	// state
-	result.mainBuffer = NewEncodeBuffer(512,result.order)
+	result.mainBuffer = NewEncodeBuffer(512, result.order)
 	result.usedTypes = NewDArray(10)
 	result.encodeBuffer = new(bytes.Buffer)
-	result.structureBuffer = NewEncodeBuffer(256,result.order)
+	result.structureBuffer = NewEncodeBuffer(256, result.order)
 	result.decodeBuffer = NewDecodeBuffer(result.order)
 
 	var err error
@@ -50,7 +86,6 @@ func NewCodec() (*codec, error) {
 
 	return result, nil
 }
-
 
 func (c *codec) useType(t uint16) {
 	c.usedTypes.Push(t)

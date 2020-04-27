@@ -45,6 +45,18 @@ func main() {
 	var encodedFull []byte
 	c, _ := codec.NewCodec()
 
+	codec.ReportAllocs("before encode")
+
+	encodedResult := c.EncodeFull(toEncode)
+	decodedBack := TestStruct{}
+
+	codec.ReportAllocs("before")
+
+	c.Decode(&decodedBack, encodedResult)
+
+	codec.ReportAllocs("after")
+
+	return
 	PrintBenchmark("binary full encode", testing.Benchmark(func(b *testing.B) {
 
 		for i := 0; i < b.N; i++ {

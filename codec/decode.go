@@ -57,7 +57,7 @@ func (c *codec) tryDecodeStructure() error {
 				return err
 			}
 
-			readed,_ := c.decodeBuffer.Read(nameReader[:sf.NameLength])
+			readed, _ := c.decodeBuffer.Read(nameReader[:sf.NameLength])
 			if readed != int(sf.NameLength) {
 				return errors.New("Read wrong amount of data when reading structure's field name")
 			}
@@ -71,55 +71,60 @@ func (c *codec) tryDecodeStructure() error {
 	return nil
 
 }
+
 var typeOfElement uint16
+
 func (c *codec) Decode(out interface{}, input []byte) error {
 
 	c.decodeBuffer.Init(input)
-
+	ReportAllocs(" - decode structure ")
 	c.tryDecodeStructure()
-
 	c.decodeBuffer.ReadUint16(&typeOfElement)
 
-	return c.readComplexFieldData(typeOfElement, reflect.ValueOf(out))
+	// todo check if type is same in out interface and binary data given
+
+	v := reflect.ValueOf(out);
+
+	return c.readComplexFieldData(typeOfElement, v)
 }
 
-
-func (c *codec) readFieldData(field codecStructField,out reflect.Value) error {
+func (c *codec) readFieldData(field codecStructField, out reflect.Value) error {
 
 	if field.Type > 26 {
 		return c.readComplexFieldData(field.Type, out)
 	} else if field.Type == 24 {
 		return c.readReferenceFieldData(field.Type, out)
 	} else {
-		return c.readSimpleFieldData(field.Type,out)
+		return c.readSimpleFieldData(field.Type, out)
 	}
 }
 
-var intval int32
-var floatval float32
+func (c *codec) readSimpleFieldData(t uint16, out reflect.Value) error {
 
-func (c *codec) readSimpleFieldData(t uint16, out reflect.Value) (err error) {
+	ReportAllocs(" - readSimpleFieldData")
 
 	tmpVal := reflect.Indirect(out)
 
 	switch t {
 	case uint16(reflect.Int), uint16(reflect.Int32):
+		err := c.decodeBuffer.ReadInt32(&c.dataBuffer.int32val)
 
-		err = c.decodeBuffer.ReadInt32(&intval);
 		if err != nil {
 			return err
 		}
 
 		if tmpVal.CanSet() {
-			tmpVal.Set(reflect.ValueOf(int(intval)))
+			tmpVal.SetInt(int64(c.dataBuffer.int32val))
 		} else {
-			return errors.New(fmt.Sprintf("Cant set value on field of type %d\n",t))
+			return errors.New(fmt.Sprintf("Cant set value on field of type %d\n", t))
 		}
 	case uint16(reflect.Float32):
+		ReportAllocs(" - read int32  ")
 
-		c.decodeBuffer.ReadFloat32(&floatval)
+		c.decodeBuffer.ReadFloat32(&c.dataBuffer.float32val)
 		if tmpVal.CanSet() {
-			tmpVal.Set(reflect.ValueOf(floatval))
+			tmpVal.SetFloat(float64(c.dataBuffer.float32val))
+			ReportAllocs("  + read field float32  ")
 		} else {
 			return errors.New("unable to set float32 value of unaccessable field")
 		}
@@ -127,16 +132,17 @@ func (c *codec) readSimpleFieldData(t uint16, out reflect.Value) (err error) {
 		return errors.New(fmt.Sprintf("Unable to decode type %", t))
 	}
 
-	return
+	ReportAllocs(" + readSimpleFieldData")
+
+	return nil
 
 }
-var referenceId uint16
 
 func (c *codec) readReferenceFieldData(t uint16, out reflect.Value) error {
 	switch t {
 	case 24:
 
-		c.decodeBuffer.ReadUint16(&referenceId)
+		c.decodeBuffer.ReadUint16(&c.dataBuffer.uint16val)
 
 		// string
 		//fmt.Printf("reading refernced data %d...\n", referenceId)
@@ -146,7 +152,6 @@ func (c *codec) readReferenceFieldData(t uint16, out reflect.Value) error {
 
 	return nil
 }
-
 
 func (c *codec) readComplexFieldData(t uint16, out reflect.Value) (err error) {
 
@@ -163,10 +168,16 @@ func (c *codec) readComplexFieldData(t uint16, out reflect.Value) (err error) {
 
 	for i := 0; i < int(tData.FieldCount); i++ {
 
+		ReportAllocs("------read complex field ")
 		f := tData.Fields[i]
 
+		typeField,_ := refValue.Type().FieldByName(f.Name)
+
+
 		fieldObj := refValue.FieldByName(f.Name)
+		ReportAllocs(fmt.Sprintf("++++++read complex field %s [%d] ",f.Name,typeField.Offset))
 		err = c.readFieldData(f, fieldObj)
+
 		if err != nil {
 			return
 		}
@@ -174,4 +185,3 @@ func (c *codec) readComplexFieldData(t uint16, out reflect.Value) (err error) {
 
 	return nil
 }
-

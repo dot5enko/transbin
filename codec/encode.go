@@ -17,8 +17,12 @@ func (c *codec) encodeInternal(obj interface{}, full bool) []byte {
 
 	o := reflect.Indirect(reflect.ValueOf(obj))
 
+	ReportAllocs("before struct reg")
+
 	// generate structures
 	generalStruct := c.registerStructure(o.Type())
+
+	ReportAllocs("after struct reg")
 
 	// data id
 	c.mainBuffer.PutUint16(generalStruct.Id)
@@ -88,6 +92,3 @@ func (c *codec) writeReferenceFieldData(t uint16, v reflect.Value) error {
 
 	return nil
 }
-
-
-

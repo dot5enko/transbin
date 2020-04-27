@@ -99,4 +99,3 @@ func (c *codec) getStructureData() []byte {
 	header := c.structureBuffer.Bytes()
 	return header
 }
-
