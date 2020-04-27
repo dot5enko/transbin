@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 	"transbin/codec"
-	"transbin/utils"
 )
 
 type NStruct struct {
@@ -53,19 +52,17 @@ func main() {
 	var encodedFull []byte
 	c, _ := codec.NewCodec()
 
-	utils.Reporting = true
+	//utils.Reporting = true
 
 	encodedResult := c.EncodeFull(toEncode)
 
-	fmt.Printf("got encoded[%d]\n",len(encodedResult))
+	fmt.Printf("got encoded[%d]\n", len(encodedResult))
 
 	decodedBack := TestStruct{}
 
 	c.Decode(&decodedBack, encodedResult)
 
-	fmt.Printf("Result of decoded Value field %f\n",decodedBack.NestedStruct.Floa)
-
-	return
+	fmt.Printf("Result of decoded Value field %f\n", decodedBack.NestedStruct.Floa)
 
 	var x []byte
 	buff := bytes.NewBuffer(x)
@@ -79,7 +76,7 @@ func main() {
 
 		for i := 0; i < b.N; i++ {
 			coder.Encode(toEncode)
-			if (i == 0) {
+			if i == 0 {
 				gobFullResult = buff.Bytes()
 			}
 			gobResult = buff.Bytes()
@@ -89,7 +86,6 @@ func main() {
 		b.ReportAllocs()
 		b.ReportMetric(float64(len(gobResult)), "encoded_size")
 	}))
-
 
 	dbuf := codec.NewDecodeBuffer(binary.BigEndian)
 	dbuf.Init(gobFullResult)
@@ -113,8 +109,7 @@ func main() {
 		b.ReportMetric(float64(dRes.NestedStruct.Floa), "encoded_size")
 	}))
 
-
-	return
+	fmt.Printf("\n")
 
 	PrintBenchmark("binary full encode", testing.Benchmark(func(b *testing.B) {
 

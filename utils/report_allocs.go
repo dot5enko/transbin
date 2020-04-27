@@ -34,4 +34,3 @@ func ReportAllocs(label string) {
 	memoryUsed += uint64(27)
 
 }
-
