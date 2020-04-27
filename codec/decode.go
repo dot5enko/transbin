@@ -6,7 +6,6 @@ import (
 	"reflect"
 )
 
-var typeDef structDefinition
 var nameReader [255]byte
 
 func (c *codec) tryDecodeStructure() error {
@@ -18,6 +17,9 @@ func (c *codec) tryDecodeStructure() error {
 	}
 
 	for i := 0; i < int(nTypes); i++ {
+
+		var typeDef structDefinition
+
 		err = c.decodeBuffer.ReadUint16(&typeDef.Id)
 		if err != nil {
 			return err
@@ -65,7 +67,7 @@ func (c *codec) tryDecodeStructure() error {
 			sf.Name = string(nameReader[:sf.NameLength])
 
 		}
-		c.types[typeDef.Id] = typeDef
+		c.types[typeDef.Id] = &typeDef
 	}
 
 	return nil
@@ -83,9 +85,16 @@ func (c *codec) Decode(out interface{}, input []byte) error {
 
 	// todo check if type is same in out interface and binary data given
 
-	v := reflect.ValueOf(out);
+	v := reflect.ValueOf(out)
+	if v.Kind() != reflect.Ptr {
+		return errors.New(fmt.Sprintf("Not addressable value (%s) provided as out parameter. it should be a pointer to structure", v.Type().Kind().String()))
+	}
 
-	return c.readComplexFieldData(typeOfElement, v)
+	indirect := reflect.Indirect(v);
+
+	//c.cacheReflectionData(typeOfElement, indirect.Type())
+
+	return c.readComplexFieldData(typeOfElement, indirect)
 }
 
 func (c *codec) readFieldData(field codecStructField, out reflect.Value) error {
@@ -171,11 +180,8 @@ func (c *codec) readComplexFieldData(t uint16, out reflect.Value) (err error) {
 		ReportAllocs("------read complex field ")
 		f := tData.Fields[i]
 
-		typeField,_ := refValue.Type().FieldByName(f.Name)
-
-
-		fieldObj := refValue.FieldByName(f.Name)
-		ReportAllocs(fmt.Sprintf("++++++read complex field %s [%d] ",f.Name,typeField.Offset))
+		fieldObj := refValue.Field(i)
+		ReportAllocs("++++++read complex field")
 		err = c.readFieldData(f, fieldObj)
 
 		if err != nil {

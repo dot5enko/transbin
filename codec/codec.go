@@ -11,7 +11,7 @@ import (
 
 type codec struct {
 	typesCount uint16
-	types      map[uint16]structDefinition
+	types      map[uint16]*structDefinition
 	order      binary.ByteOrder
 	typeMap    map[string]uint16
 
@@ -38,27 +38,15 @@ const statFormat string = "%4d %8d %25s\n"
 //var prevMallocs, curMallocs,mallocs uint64
 
 func ReportAllocs(label string) {
+		runtime.ReadMemStats(&res)
 
-	runtime.ReadMemStats(&res)
+		if reports == 0 {
+			firstRun = res
+		}
 
-	if reports == 0 {
-		firstRun = res
-	}
+		fmt.Printf(statFormat, res.Mallocs-uint64(allocsPerRun*reports)-firstRun.Mallocs, res.Alloc-firstRun.Alloc, label)
 
-	//prevMallocs = prev.Mallocs - uint64(allocsPerRun*(reports-1))
-	//
-	//if prevMallocs < 0 {
-	//	prevMallocs = 0
-	//} else if prevMallocs > 1000000 {
-	//	prevMallocs = 0
-	//}
-	//
-	//curMallocs = res.Mallocs - uint64(allocsPerRun*reports)
-	//mallocs = curMallocs - prevMallocs
-
-	fmt.Printf(statFormat, res.Mallocs-uint64(allocsPerRun*reports)-firstRun.Mallocs, res.Alloc-firstRun.Alloc, label)
-
-	reports++
+		reports++
 }
 
 func NewCodec() (*codec, error) {
@@ -67,7 +55,7 @@ func NewCodec() (*codec, error) {
 	// in order to not interfer with internal types
 
 	result.typesCount = 27
-	result.types = make(map[uint16]structDefinition)
+	result.types = make(map[uint16]*structDefinition)
 	result.order = binary.BigEndian
 	result.typeMap = make(map[string]uint16)
 
@@ -113,4 +101,30 @@ func (c *codec) putReference(v reflect.Value) (uint16, error) {
 
 	return uint16(id), err
 
+}
+
+func (c *codec) cacheReflectionData(typeId uint16, t reflect.Type) error {
+	tData,ok := c.types[typeId]
+	if (!ok) {
+		return errors.New("unable to found a type declaration in codec")
+	}
+
+	if (tData.Offsets > 0) {
+		return nil
+	}
+
+	for i:= 0; i < int(tData.FieldCount); i++ {
+		f := &tData.Fields[i]
+
+		refField, found := t.FieldByName(f.Name);
+
+		if (!found) {
+			return errors.New(fmt.Sprintf("field %s not found",f.Name))
+		}
+
+		f.Offset = refField.Offset
+	}
+
+	tData.Offsets = 1
+	return nil
 }

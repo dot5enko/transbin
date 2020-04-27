@@ -10,15 +10,18 @@ type structDefinition struct {
 	FieldCount uint8 // max 255 fields
 	Id         uint16
 	Name       string
+
+	Offsets uint8
 }
 
 type codecStructField struct {
 	NameLength uint8
 	Name       string
 	Type       uint16 // reference to sturct definition
+	Offset     uintptr
 }
 
-func (c *codec) registerStructure(ot reflect.Type) structDefinition {
+func (c *codec) registerStructure(ot reflect.Type) *structDefinition {
 
 	name := ot.PkgPath() + "." + ot.Name()
 	value, ok := c.typeMap[name]
@@ -57,7 +60,7 @@ func (c *codec) registerStructure(ot reflect.Type) structDefinition {
 			}
 		}
 
-		c.types[structDef.Id] = structDef
+		c.types[structDef.Id] = &structDef
 		c.typeMap[name] = structDef.Id
 
 		return c.types[structDef.Id]
