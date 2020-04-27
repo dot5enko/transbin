@@ -21,7 +21,10 @@ type codecStructField struct {
 	Offset     uintptr
 }
 
-func (c *codec) registerStructure(ot reflect.Type) *structDefinition {
+func (c *codec) registerStructure(o reflect.Value) *structDefinition {
+
+	oIndirect := reflect.Indirect(o)
+	ot := oIndirect.Type()
 
 	name := ot.PkgPath() + "." + ot.Name()
 	value, ok := c.typeMap[name]
@@ -43,7 +46,7 @@ func (c *codec) registerStructure(ot reflect.Type) *structDefinition {
 		for i := 0; i < fieldsCount; i++ {
 
 			fData := ot.Field(i)
-			ft := fData.Type
+			ft := reflect.Indirect(oIndirect.Field(i)).Type()
 
 			structDef.Fields[i].Name = fData.Name
 
@@ -54,7 +57,7 @@ func (c *codec) registerStructure(ot reflect.Type) *structDefinition {
 			}
 
 			if ft.Kind() == 25 {
-				structDef.Fields[i].Type = c.registerStructure(ft).Id
+				structDef.Fields[i].Type = c.registerStructure(o.Field(i)).Id
 			} else {
 				structDef.Fields[i].Type = uint16(ft.Kind())
 			}

@@ -3,11 +3,9 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"testing"
 	"time"
 	"transbin/codec"
-	"unsafe"
 )
 
 type NStruct struct {
@@ -15,12 +13,13 @@ type NStruct struct {
 	Nstring int
 	N3      int
 	N5      int
+	Floa    float64
 }
 
 type TestStruct struct {
 	Id           int
 	Value        float32
-	NestedStruct *NStruct
+	NestedStruct NStruct
 }
 
 func PrintBenchmark(label string, result testing.BenchmarkResult) {
@@ -39,58 +38,25 @@ func main() {
 	toEncode.Id = 49
 	toEncode.Value = 32720.2383
 
-	toEncode.NestedStruct = &NStruct{}
+	//toEncode.NestedStruct = &NStruct{}
 
 	toEncode.NestedStruct.Nint = 99
 	toEncode.NestedStruct.Nstring = 38
 	toEncode.NestedStruct.N3 = 33
 	toEncode.NestedStruct.N5 = 55
-
-	var tjDecode = TestStruct{}
-	jsonWithPointer,_ := json.Marshal(toEncode)
-	fmt.Printf("Json with pointer %s \n",jsonWithPointer)
-
-	json.Unmarshal(jsonWithPointer,&tjDecode)
-
-	fmt.Printf("decoded with pointer: %s\n",tjDecode)
-
-return
-	if false{
-
-		x0 := TestStruct{}
-		x0.Value = 50
-
-		fmt.Printf("Got a struct with value = %d\n", x0.Value)
-
-		refValue := reflect.Indirect(reflect.ValueOf(&x0))
-
-		typeField, _ := refValue.Type().FieldByName("Value")
-		unsafeAddr := refValue.UnsafeAddr()
-
-		*(*float32)(unsafe.Pointer(unsafeAddr + typeField.Offset)) = 3823.3823 // dangerous!
-
-		fmt.Printf("Got a field at offset %d  of %p\n", typeField.Offset, unsafeAddr)
-		fmt.Printf("Got a struct with value = %d\n", x0.Value)
-
-		return
-
-	}
-
-	fmt.Printf(" enc result %s\n", toEncode)
+	toEncode.NestedStruct.Floa = 28973892.3833
 
 	var encodedFull []byte
 	c, _ := codec.NewCodec()
 
-	codec.ReportAllocs("before encode")
-
 	encodedResult := c.EncodeFull(toEncode)
+
 	decodedBack := TestStruct{}
 
-	codec.ReportAllocs("before")
+	//codec.Reporting = true
 
 	c.Decode(&decodedBack, encodedResult)
-
-	codec.ReportAllocs("after")
+	//return
 
 	//return
 	PrintBenchmark("binary full encode", testing.Benchmark(func(b *testing.B) {

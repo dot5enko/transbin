@@ -70,3 +70,8 @@ func (this *encode_buffer) WriteByte(u uint8) {
 	this.data[this.pos] = u
 	this.pos++
 }
+
+func (this *encode_buffer) PutFloat64(f float64) {
+	this.order.PutUint64(this.data[this.pos:], math.Float64bits(f))
+	this.pos += 8
+}

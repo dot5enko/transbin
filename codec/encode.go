@@ -17,12 +17,10 @@ func (c *codec) encodeInternal(obj interface{}, full bool) []byte {
 
 	o := reflect.Indirect(reflect.ValueOf(obj))
 
-	ReportAllocs("before struct reg")
 
 	// generate structures
-	generalStruct := c.registerStructure(o.Type())
+	generalStruct := c.registerStructure(o)
 
-	ReportAllocs("after struct reg")
 
 	// data id
 	c.mainBuffer.PutUint16(generalStruct.Id)
@@ -55,6 +53,8 @@ func (c *codec) writeSimpleFieldData(v reflect.Value) {
 		c.mainBuffer.PutInt32(int32(v.Interface().(int)))
 	case reflect.Float32:
 		c.mainBuffer.PutFloat32(v.Interface().(float32))
+	case reflect.Float64:
+		c.mainBuffer.PutFloat64(v.Interface().(float64))
 	default:
 		panic("no handler for writing simple type " + v.Kind().String())
 	}
@@ -67,7 +67,7 @@ func (c *codec) writeComplexFieldData(t uint16, v reflect.Value) {
 	cf := c.types[t].Fields
 
 	for i := 0; i < int(c.types[t].FieldCount); i++ {
-		c.writeFieldData(cf[i], v.Field(i))
+		c.writeFieldData(cf[i], reflect.Indirect(v).Field(i))
 	}
 }
 

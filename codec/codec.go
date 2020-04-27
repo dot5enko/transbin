@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"runtime"
 )
 
 type codec struct {
@@ -23,30 +22,13 @@ type codec struct {
 	structureBuffer *encode_buffer
 	decodeBuffer    *decode_buffer
 	dataBuffer      struct {
+		byte       uint8
 		int32val   int32
 		float32val float32
+		float64val float64
 		uint16val  uint16
+		nameReader [255]byte
 	}
-}
-
-var res, firstRun runtime.MemStats
-var reports int
-
-const allocsPerRun int = 3
-const statFormat string = "%4d %8d %25s\n"
-
-//var prevMallocs, curMallocs,mallocs uint64
-
-func ReportAllocs(label string) {
-		runtime.ReadMemStats(&res)
-
-		if reports == 0 {
-			firstRun = res
-		}
-
-		fmt.Printf(statFormat, res.Mallocs-uint64(allocsPerRun*reports)-firstRun.Mallocs, res.Alloc-firstRun.Alloc, label)
-
-		reports++
 }
 
 func NewCodec() (*codec, error) {
@@ -104,22 +86,22 @@ func (c *codec) putReference(v reflect.Value) (uint16, error) {
 }
 
 func (c *codec) cacheReflectionData(typeId uint16, t reflect.Type) error {
-	tData,ok := c.types[typeId]
-	if (!ok) {
+	tData, ok := c.types[typeId]
+	if !ok {
 		return errors.New("unable to found a type declaration in codec")
 	}
 
-	if (tData.Offsets > 0) {
+	if tData.Offsets > 0 {
 		return nil
 	}
 
-	for i:= 0; i < int(tData.FieldCount); i++ {
+	for i := 0; i < int(tData.FieldCount); i++ {
 		f := &tData.Fields[i]
 
-		refField, found := t.FieldByName(f.Name);
+		refField, found := t.FieldByName(f.Name)
 
-		if (!found) {
-			return errors.New(fmt.Sprintf("field %s not found",f.Name))
+		if !found {
+			return errors.New(fmt.Sprintf("field %s not found", f.Name))
 		}
 
 		f.Offset = refField.Offset

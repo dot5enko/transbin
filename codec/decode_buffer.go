@@ -40,6 +40,14 @@ func (this *decode_buffer) Next(i int) {
 	this.pos += i
 }
 
+func (this *decode_buffer) ReadUint8(dest *uint8) error {
+
+	*dest = this.data[this.pos]
+	this.pos++
+
+	return nil
+}
+
 func (this *decode_buffer) ReadUint16(dest *uint16) (err error) {
 	*dest = this.order.Uint16(this.data[this.pos:])
 	this.pos += 2
@@ -58,6 +66,13 @@ func (this *decode_buffer) ReadInt32(data *int32) error {
 func (this *decode_buffer) ReadFloat32(data *float32) error {
 	*data = math.Float32frombits(this.order.Uint32(this.data[this.pos:]))
 	this.pos += 4
+
+	return nil
+}
+
+func (this *decode_buffer) ReadFloat64(data *float64) error {
+	*data = math.Float64frombits(this.order.Uint64(this.data[this.pos:]))
+	this.pos += 8
 
 	return nil
 }
