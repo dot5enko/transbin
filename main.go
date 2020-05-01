@@ -3,9 +3,9 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/dot5enko/transbin/codec"
 	"testing"
 	"time"
-	"transbin/codec"
 )
 
 type NStruct struct {
