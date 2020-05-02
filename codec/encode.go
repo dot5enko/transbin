@@ -18,7 +18,7 @@ func (c *codec) encodeInternal(obj interface{}, full bool) ([]byte, error) {
 	o := reflect.Indirect(reflect.ValueOf(obj))
 
 	// generate structures
-	generalStruct, err := c.registerStructure(o)
+	generalStruct, err := c.registerStructure(o.Type())
 	if err != nil {
 		return nil, err
 	}

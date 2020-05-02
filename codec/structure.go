@@ -1,7 +1,6 @@
 package codec
 
 import (
-	"github.com/dot5enko/transbin/utils"
 	"log"
 	"reflect"
 )
@@ -44,10 +43,11 @@ func getArrayElementType(typeId uint16) uint16 {
 	return typeId
 }
 
-func (c *codec) registerStructure(o reflect.Value) (*structDefinition, error) {
+func (c *codec) registerStructure(ot reflect.Type) (*structDefinition, error) {
 
-	oIndirect := reflect.Indirect(o)
-	ot := oIndirect.Type()
+	if (ot.Kind() == reflect.Ptr) {
+		ot = ot.Elem()
+	}
 
 	name := getTypeCode(ot)
 	value, ok := c.typeMap[name]
@@ -71,7 +71,7 @@ func (c *codec) registerStructure(o reflect.Value) (*structDefinition, error) {
 			sf := &structDef.Fields[i]
 
 			fData := ot.Field(i)
-			ft := reflect.Indirect(oIndirect.Field(i)).Type()
+			ft := fData.Type
 
 			sf.Name = fData.Name
 
@@ -87,7 +87,7 @@ func (c *codec) registerStructure(o reflect.Value) (*structDefinition, error) {
 			case reflect.Struct:
 
 				// could produce npe
-				nested, err := c.registerStructure(o.Field(i))
+				nested, err := c.registerStructure(ot.Field(i).Type)
 				if err != nil {
 					return nil, err
 				}
@@ -113,7 +113,13 @@ func (c *codec) registerStructure(o reflect.Value) (*structDefinition, error) {
 					ok = false
 					typeWithArrayFlag, ok = c.typeMap[getTypeCode(sliceElem)]
 					if !ok {
-						return nil, utils.Error("Unable to get a type for slice's struct %s", sliceElem.String())
+						nested,err := c.registerStructure(sliceElem)
+						if (err != nil) {
+							return nil, err
+						}
+
+						typeWithArrayFlag = nested.Id
+
 					}
 				default:
 					typeWithArrayFlag = uint16(sliceElem.Kind())
@@ -152,10 +158,13 @@ func (c *codec) getStructureData() []byte {
 	// number of types in list
 	c.structureBuffer.WriteByte(uint8(numberOfTypes))
 
-	for i := 0; i < c.usedTypes.Length(); i++ {
+	//
+	c.usedTypes.Sort()
+
+	for i := c.usedTypes.Length() - 1; i >= 0; i-- {
 
 		v := c.usedTypes.data[i]
-		t := c.types[v]
+		t := c.types[uint16(v)]
 
 		// type id uint16
 		c.structureBuffer.PutUint16(t.Id)

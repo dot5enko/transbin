@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/dot5enko/transbin/utils"
 	"log"
 	"reflect"
 )
@@ -132,7 +133,9 @@ func (c *codec) putReference(t uint16, v reflect.Value) (reference uint16, err e
 	var refData []byte
 
 	if isArrayType(t) {
-		refData, err = c.writeSliceFieldData(getArrayElementType(t), v)
+		at :=getArrayElementType(t)
+		c.useType(at)
+		refData, err = c.writeSliceFieldData(at, v)
 	} else {
 		switch v.Kind() {
 		case reflect.String:
@@ -179,8 +182,19 @@ func (c *codec) cacheReflectionData(typeId uint16, t reflect.Type) error {
 
 func (c *codec) getTypeSize(t uint16) (int, error) {
 
+	if isArrayType(t) {
+		return 2, nil
+	}
+
 	if t > internalTypesCount {
-		return c.types[t].Size, nil
+
+		tref, ok := c.types[t]
+
+		if !ok {
+			return 0, utils.Error("Unable to found a size for type %d", t)
+		}
+
+		return tref.Size, nil
 	} else {
 		switch reflect.Kind(t) {
 		case reflect.Bool, reflect.Uint8:

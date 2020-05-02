@@ -20,8 +20,7 @@ type NStruct struct {
 type TestStruct struct {
 	Id           int
 	Value        float32
-	Ids          []int32
-	NestedStruct NStruct
+	NestedStruct []NStruct
 }
 
 func PrintBenchmark(label string, result testing.BenchmarkResult) {
@@ -39,15 +38,18 @@ func main() {
 
 	toEncode.Id = 49
 	toEncode.Value = 32720.2383
-	toEncode.Ids = []int32{99, 88, 77, 66, 55, 44, 33, 22, 11}
-	//toEncode.NestedStruct = &NStruct{}
+	//toEncode.Ids = []int32{99, 88, 77, 66, 55, 44, 33, 22, 11}
+	ids := 3
+	toEncode.NestedStruct = make([]NStruct, ids)
 
-	toEncode.NestedStruct.Nint = 99
-	toEncode.NestedStruct.Nstring = 38
-	toEncode.NestedStruct.N3 = 33
-	toEncode.NestedStruct.N5 = 55
-	toEncode.NestedStruct.Floa = 28973892.3833
-	toEncode.NestedStruct.Fl2 = 99.98765432
+	for i := 0; i < ids; i++ {
+		toEncode.NestedStruct[i].Nint = 99
+		toEncode.NestedStruct[i].Nstring = 38
+		toEncode.NestedStruct[i].N3 = 33
+		toEncode.NestedStruct[i].N5 = 55
+		toEncode.NestedStruct[i].Floa = 28973892.3833
+		toEncode.NestedStruct[i].Fl2 = 99.98765432
+	}
 
 	jb0, _ := json.Marshal(toEncode)
 	fmt.Printf("Bef a result : %s\n", jb0)
@@ -62,17 +64,17 @@ func main() {
 
 	fmt.Printf("Got encoded data %d bytes length\n", len(encodedResult))
 
-	decodedBack := TestStruct{}
-
-	//codec.Reporting = true
-	err = c.Decode(&decodedBack, encodedResult)
-	if err != nil {
-		panic(err)
-	}
-
-	jb, _ := json.Marshal(decodedBack)
-	fmt.Printf("Got a result : %s\n", jb)
-	return
+	//decodedBack := TestStruct{}
+	//
+	////codec.Reporting = true
+	//err = c.Decode(&decodedBack, encodedResult)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//
+	//jb, _ := json.Marshal(decodedBack)
+	//fmt.Printf("Got a result : %s\n", jb)
+	//return
 
 	//return
 	PrintBenchmark("binary full encode", testing.Benchmark(func(b *testing.B) {
@@ -97,7 +99,7 @@ func main() {
 		}
 
 		b.ReportAllocs()
-		b.ReportMetric(float64(x.NestedStruct.Nint), "encoded_size")
+		b.ReportMetric(float64(x.NestedStruct[0].Floa), "encoded_size")
 	}))
 
 	fmt.Println("")
@@ -132,7 +134,7 @@ func main() {
 		}
 
 		b.ReportAllocs()
-		b.ReportMetric(float64(x.NestedStruct.Nint), "encoded_size")
+		b.ReportMetric(float64(x.NestedStruct[0].Floa), "encoded_size")
 	}))
 
 	fmt.Println("")
@@ -159,7 +161,7 @@ func main() {
 		}
 
 		b.ReportAllocs()
-		b.ReportMetric(float64(x.NestedStruct.Nint), "encoded_size")
+		b.ReportMetric(float64(x.NestedStruct[0].Floa), "encoded_size")
 	}))
 
 }

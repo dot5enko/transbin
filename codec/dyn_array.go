@@ -1,15 +1,17 @@
 package codec
 
+import "sort"
+
 type DynamicArray struct {
 	pos  int
 	size int
-	data []uint16
+	data []int
 }
 
 func NewDArray(size int) *DynamicArray {
 	result := &DynamicArray{}
 
-	result.data = make([]uint16, size)
+	result.data = make([]int, size)
 	result.size = size
 
 	return result
@@ -21,7 +23,7 @@ func (this *DynamicArray) Clear() {
 
 func (this *DynamicArray) Push(val uint16) {
 	if !this.Contains(val) {
-		this.data[this.pos] = val
+		this.data[this.pos] = int(val)
 		this.pos++
 	}
 }
@@ -33,7 +35,7 @@ func (this *DynamicArray) Contains(val uint16) bool {
 	}
 
 	for i := 0; i < this.pos; i++ {
-		if this.data[i] == val {
+		if this.data[i] == int(val) {
 			return true
 		}
 	}
@@ -43,4 +45,8 @@ func (this *DynamicArray) Contains(val uint16) bool {
 
 func (this *DynamicArray) Length() int {
 	return this.pos
+}
+
+func (this *DynamicArray) Sort() {
+	sort.Ints(this.data[:this.pos])
 }

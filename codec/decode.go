@@ -47,6 +47,7 @@ func (c *codec) tryDecodeStructure() (int, error) {
 	headerSize += 1
 
 	for i := 0; i < int(nTypes); i++ {
+
 		var typeDef structDefinition
 		err = c.decodeBuffer.ReadUint16(&typeDef.Id)
 
@@ -95,9 +96,8 @@ func (c *codec) tryDecodeStructure() (int, error) {
 				headerSize += int(typeDef.Fields[j].NameLength)
 
 				typeDef.Size += typeDef.Fields[j].Size
-				fmt.Printf(" adding %s field size : %d -> %d\n", typeDef.Fields[j].Name, typeDef.Fields[j].Size, typeDef.Size)
-
 			}
+
 			c.types[typeDef.Id] = &typeDef
 		}
 	}
