@@ -1,6 +1,7 @@
 package codec
 
 import (
+	"github.com/dot5enko/transbin/utils"
 	"log"
 	"reflect"
 )
@@ -11,7 +12,11 @@ type structDefinition struct {
 	Id         uint16
 	Name       string
 
+	// not used
 	Offsets uint8
+
+	// size of codec structure
+	Size int
 }
 
 type codecStructField struct {
@@ -19,17 +24,35 @@ type codecStructField struct {
 	Name       string
 	Type       uint16 // reference to sturct definition
 	Offset     uintptr
+	Size       int
 }
 
-func (c *codec) registerStructure(o reflect.Value) *structDefinition {
+func getTypeCode(ot reflect.Type) string {
+	return ot.PkgPath() + "." + ot.Name()
+}
+
+func isArrayType(typeId uint16) bool {
+	return ((typeId >> 15) & 1) == 1
+}
+func setArrayTypeFlag(typeId uint16) uint16 {
+	typeId |= (1 << 15)
+	return typeId
+}
+func getArrayElementType(typeId uint16) uint16 {
+	mask := ^(1 << 15)
+	typeId &= uint16(mask)
+	return typeId
+}
+
+func (c *codec) registerStructure(o reflect.Value) (*structDefinition, error) {
 
 	oIndirect := reflect.Indirect(o)
 	ot := oIndirect.Type()
 
-	name := ot.PkgPath() + "." + ot.Name()
+	name := getTypeCode(ot)
 	value, ok := c.typeMap[name]
 	if ok {
-		return c.types[value]
+		return c.types[value], nil
 	} else {
 
 		fieldsCount := ot.NumField()
@@ -45,28 +68,76 @@ func (c *codec) registerStructure(o reflect.Value) *structDefinition {
 
 		for i := 0; i < fieldsCount; i++ {
 
+			sf := &structDef.Fields[i]
+
 			fData := ot.Field(i)
 			ft := reflect.Indirect(oIndirect.Field(i)).Type()
 
-			structDef.Fields[i].Name = fData.Name
+			sf.Name = fData.Name
 
 			actualLenght := len(fData.Name)
-			structDef.Fields[i].NameLength = uint8(actualLenght)
-			if actualLenght != int(structDef.Fields[i].NameLength) {
+			sf.NameLength = uint8(actualLenght)
+			if actualLenght != int(sf.NameLength) {
 				log.Printf("Field name is too long. field name was truncated, which may produce errors on decoding step")
 			}
 
-			if ft.Kind() == 25 {
-				structDef.Fields[i].Type = c.registerStructure(o.Field(i)).Id
-			} else {
-				structDef.Fields[i].Type = uint16(ft.Kind())
+			var err error
+
+			switch ft.Kind() {
+			case reflect.Struct:
+
+				// could produce npe
+				nested, err := c.registerStructure(o.Field(i))
+				if err != nil {
+					return nil, err
+				}
+				sf.Type = nested.Id
+				sf.Size = nested.Size
+			case reflect.Slice:
+
+				sliceElem := ft.Elem()
+
+				// unroll pointers
+				for {
+					if sliceElem.Kind() == reflect.Ptr {
+						sliceElem = sliceElem.Elem()
+					} else {
+						break
+					}
+				}
+
+				var typeWithArrayFlag uint16 = 0
+
+				switch sliceElem.Kind() {
+				case reflect.Struct:
+					ok = false
+					typeWithArrayFlag, ok = c.typeMap[getTypeCode(sliceElem)]
+					if !ok {
+						return nil, utils.Error("Unable to get a type for slice's struct %s", sliceElem.String())
+					}
+				default:
+					typeWithArrayFlag = uint16(sliceElem.Kind())
+				}
+
+				// set array bit flag
+				typeWithArrayFlag = setArrayTypeFlag(typeWithArrayFlag)
+				sf.Type = typeWithArrayFlag
+				sf.Size = 2 // reference
+			default:
+				sf.Type = uint16(ft.Kind())
+				sf.Size, err = c.getTypeSize(sf.Type)
+				if err != nil {
+					return nil, err
+				}
 			}
+
+			structDef.Size += sf.Size
 		}
 
 		c.types[structDef.Id] = &structDef
 		c.typeMap[name] = structDef.Id
 
-		return c.types[structDef.Id]
+		return c.types[structDef.Id], nil
 	}
 }
 

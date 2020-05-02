@@ -14,11 +14,13 @@ type NStruct struct {
 	N3      int
 	N5      int
 	Floa    float64
+	Fl2     float64
 }
 
 type TestStruct struct {
 	Id           int
 	Value        float32
+	Ids          []int32
 	NestedStruct NStruct
 }
 
@@ -37,7 +39,7 @@ func main() {
 
 	toEncode.Id = 49
 	toEncode.Value = 32720.2383
-
+	toEncode.Ids = []int32{99, 88, 77, 66, 55, 44, 33, 22, 11}
 	//toEncode.NestedStruct = &NStruct{}
 
 	toEncode.NestedStruct.Nint = 99
@@ -45,24 +47,38 @@ func main() {
 	toEncode.NestedStruct.N3 = 33
 	toEncode.NestedStruct.N5 = 55
 	toEncode.NestedStruct.Floa = 28973892.3833
+	toEncode.NestedStruct.Fl2 = 99.98765432
+
+	jb0, _ := json.Marshal(toEncode)
+	fmt.Printf("Bef a result : %s\n", jb0)
 
 	var encodedFull []byte
 	c, _ := codec.NewCodec()
 
-	encodedResult := c.EncodeFull(toEncode)
+	encodedResult, err := c.EncodeFull(toEncode)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("Got encoded data %d bytes length\n", len(encodedResult))
 
 	decodedBack := TestStruct{}
 
 	//codec.Reporting = true
+	err = c.Decode(&decodedBack, encodedResult)
+	if err != nil {
+		panic(err)
+	}
 
-	c.Decode(&decodedBack, encodedResult)
-	//return
+	jb, _ := json.Marshal(decodedBack)
+	fmt.Printf("Got a result : %s\n", jb)
+	return
 
 	//return
 	PrintBenchmark("binary full encode", testing.Benchmark(func(b *testing.B) {
 
 		for i := 0; i < b.N; i++ {
-			encodedFull = c.EncodeFull(toEncode)
+			encodedFull, _ = c.EncodeFull(toEncode)
 		}
 
 		b.ReportAllocs()
@@ -92,7 +108,7 @@ func main() {
 	PrintBenchmark("binary data encode", testing.Benchmark(func(b *testing.B) {
 
 		for i := 0; i < b.N; i++ {
-			encoded = bin.Encode(toEncode)
+			encoded, _ = bin.Encode(toEncode)
 		}
 
 		b.ReportAllocs()

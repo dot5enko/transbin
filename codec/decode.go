@@ -3,6 +3,7 @@ package codec
 import (
 	"errors"
 	"fmt"
+	"github.com/dot5enko/transbin/utils"
 	"reflect"
 )
 
@@ -25,29 +26,40 @@ func (c *codec) readStructFieldData() (sf codecStructField, err error) {
 
 	sf.Name = string(c.dataBuffer.nameReader[:sf.NameLength])
 
+	// calc size in struct
+	sf.Size, err = c.getTypeSize(sf.Type)
+
 	return
 
 }
-func (c *codec) tryDecodeStructure() error {
+
+// returns struct header size
+func (c *codec) tryDecodeStructure() (int, error) {
+
+	headerSize := 0
 
 	// read number of types
 	nTypes, err := c.decodeBuffer.ReadByte()
 	if err != nil {
-		return err
+		return headerSize, err
 	}
+
+	headerSize += 1
 
 	for i := 0; i < int(nTypes); i++ {
 		var typeDef structDefinition
 		err = c.decodeBuffer.ReadUint16(&typeDef.Id)
+
 		if err != nil {
-			return err
+			return headerSize, err
 		}
+		headerSize += 2
 
 		typeDef.FieldCount, err = c.decodeBuffer.ReadByte()
-
 		if err != nil {
-			return err
+			return headerSize, err
 		}
+		headerSize += 1
 
 		skip := false
 		if _, ok := c.types[typeDef.Id]; ok {
@@ -55,7 +67,12 @@ func (c *codec) tryDecodeStructure() error {
 
 			for j := 0; j < int(typeDef.FieldCount); j++ {
 				c.decodeBuffer.Next(2)
+
 				nameLength, _ := c.decodeBuffer.ReadByte()
+				// name and type
+				headerSize += 3
+				headerSize += int(nameLength)
+
 				c.decodeBuffer.Next(int(nameLength))
 			}
 
@@ -68,24 +85,48 @@ func (c *codec) tryDecodeStructure() error {
 
 			for j := 0; j < int(typeDef.FieldCount); j++ {
 
-				typeDef.Fields[j], _ = c.readStructFieldData()
+				typeDef.Fields[j], err = c.readStructFieldData()
+				if err != nil {
+					return headerSize, err
+				}
+
+				// type and nameLength
+				headerSize += 3
+				headerSize += int(typeDef.Fields[j].NameLength)
+
+				typeDef.Size += typeDef.Fields[j].Size
+				fmt.Printf(" adding %s field size : %d -> %d\n", typeDef.Fields[j].Name, typeDef.Fields[j].Size, typeDef.Size)
 
 			}
 			c.types[typeDef.Id] = &typeDef
 		}
 	}
 
-	return nil
+	return headerSize, nil
 
 }
 
 func (c *codec) Decode(out interface{}, input []byte) error {
 
 	c.decodeBuffer.Init(input)
-	c.tryDecodeStructure()
+
+	headerSize, err := c.tryDecodeStructure()
+
+	if err != nil {
+		return err
+	}
 
 	var typeOfElement uint16
 	c.decodeBuffer.ReadUint16(&typeOfElement)
+
+	structSize, err := c.getTypeSize(typeOfElement)
+	if err != nil {
+		return err
+	}
+
+	refsOffset := structSize + headerSize + 2 // 2 bytes for struct type
+
+	c.ref.Reader.Init(input[refsOffset:])
 
 	// todo check if type is same in out interface and binary data given
 
@@ -103,12 +144,20 @@ func (c *codec) Decode(out interface{}, input []byte) error {
 
 func (c *codec) readFieldData(field codecStructField, out reflect.Value) error {
 
-	if field.Type > 26 {
-		return c.readComplexFieldData(field.Type, out)
-	} else if field.Type == 24 {
-		return c.readReferenceFieldData(field.Type, out)
+	if isArrayType(field.Type) {
+		return c.readArrayElement(getArrayElementType(field.Type), out)
 	} else {
-		return c.readSimpleFieldData(field.Type, out)
+		if field.Type > internalTypesCount {
+			return c.readComplexFieldData(field.Type, out)
+		} else {
+			switch reflect.Kind(field.Type) {
+			case reflect.String:
+				return c.readReferenceFieldData(field.Type, out)
+			default:
+				return c.readSimpleFieldData(field.Type, out)
+			}
+
+		}
 	}
 }
 
@@ -132,7 +181,7 @@ func (c *codec) readSimpleFieldData(t uint16, out reflect.Value) error {
 	case uint16(reflect.Float64):
 		c.decodeBuffer.ReadFloat64(&c.dataBuffer.float64val)
 		if tmpVal.CanSet() {
-			tmpVal.SetFloat(float64(c.dataBuffer.float32val))
+			tmpVal.SetFloat(float64(c.dataBuffer.float64val))
 		} else {
 			return errors.New("unable to set float32 value of unaccessable field")
 		}
@@ -148,19 +197,26 @@ func (c *codec) readSimpleFieldData(t uint16, out reflect.Value) error {
 		return errors.New(fmt.Sprintf("Unable to decode type %", t))
 	}
 
-
 	return nil
 
 }
 
 func (c *codec) readReferenceFieldData(t uint16, out reflect.Value) error {
-	switch t {
-	case 24:
 
-		c.decodeBuffer.ReadUint16(&c.dataBuffer.uint16val)
+	c.decodeBuffer.ReadUint16(&c.dataBuffer.uint16val)
+
+	refBytes, length, err := c.ref.Reader.Get(uint64(c.dataBuffer.uint16val))
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("got ref bytes: = %s:%d. type = %d\n", refBytes, length, t)
+
+	switch t {
+	case uint16(reflect.String):
+	case uint16(reflect.Slice):
 
 		// string
-		//fmt.Printf("reading refernced data %d...\n", referenceId)
 	default:
 		return errors.New(fmt.Sprintf("Unable to decode referenced type %d\n", t))
 	}
@@ -173,7 +229,7 @@ func (c *codec) readComplexFieldData(t uint16, out reflect.Value) (err error) {
 	refValue := reflect.Indirect(out)
 
 	if refValue.Kind() != reflect.Struct {
-		return errors.New("cannot decode data to " + refValue.Kind().String())
+		return utils.Error("cannot decode data to %s", refValue.Kind().String())
 	}
 
 	tData, ok := c.types[t]

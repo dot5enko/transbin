@@ -20,6 +20,10 @@ func (this *decode_buffer) Init(b []byte) {
 	this.pos = 0
 }
 
+func (this *decode_buffer) GotoPos(pos int) {
+	this.pos = pos
+}
+
 func (this *decode_buffer) ReadByte() (n byte, err error) {
 
 	n = this.data[this.pos]

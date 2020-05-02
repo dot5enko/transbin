@@ -4,29 +4,33 @@ import (
 	"reflect"
 )
 
-func (c *codec) EncodeFull(obj interface{}) []byte {
+func (c *codec) EncodeFull(obj interface{}) ([]byte, error) {
 	return c.encodeInternal(obj, true)
 }
-func (c *codec) Encode(obj interface{}) []byte {
+func (c *codec) Encode(obj interface{}) ([]byte, error) {
 	return c.encodeInternal(obj, false)
 }
 
-func (c *codec) encodeInternal(obj interface{}, full bool) []byte {
+func (c *codec) encodeInternal(obj interface{}, full bool) ([]byte, error) {
 
 	c.reset()
 
 	o := reflect.Indirect(reflect.ValueOf(obj))
 
-
 	// generate structures
-	generalStruct := c.registerStructure(o)
-
+	generalStruct, err := c.registerStructure(o)
+	if err != nil {
+		return nil, err
+	}
 
 	// data id
 	c.mainBuffer.PutUint16(generalStruct.Id)
 
 	// data
-	c.writeComplexFieldData(generalStruct.Id, o)
+	err = c.writeComplexType(generalStruct.Id, o)
+	if err != nil {
+		return nil, err
+	}
 
 	// write structure
 	if full {
@@ -41,7 +45,7 @@ func (c *codec) encodeInternal(obj interface{}, full bool) []byte {
 	// dynamic length data
 	c.encodeBuffer.Write(c.ref.buff.Bytes())
 
-	return c.encodeBuffer.Bytes()
+	return c.encodeBuffer.Bytes(), nil
 }
 
 func (c *codec) writeSimpleFieldData(v reflect.Value) {
@@ -60,30 +64,77 @@ func (c *codec) writeSimpleFieldData(v reflect.Value) {
 	}
 }
 
-func (c *codec) writeComplexFieldData(t uint16, v reflect.Value) {
+func (c *codec) writeComplexType(t uint16, v reflect.Value) (err error) {
 
 	c.useType(t)
 
 	cf := c.types[t].Fields
 
 	for i := 0; i < int(c.types[t].FieldCount); i++ {
-		c.writeFieldData(cf[i], reflect.Indirect(v).Field(i))
+		err = c.writeFieldData(cf[i], reflect.Indirect(v).Field(i))
+		if err != nil {
+			return
+		}
 	}
+
+	return
+
 }
 
-func (c *codec) writeFieldData(field codecStructField, v reflect.Value) {
-	if field.Type > 26 {
-		c.writeComplexFieldData(field.Type, v)
-	} else if field.Type == 24 {
-		c.writeReferenceFieldData(field.Type, v)
+func (c *codec) writeFieldData(field codecStructField, v reflect.Value) (err error) {
+
+	if isArrayType(field.Type) {
+		err = c.writeReferenceFieldData(field.Type, v)
+		if err != nil {
+			return
+		}
 	} else {
-		c.writeSimpleFieldData(v)
+		if field.Type > internalTypesCount {
+			err = c.writeComplexType(field.Type, v)
+			if err != nil {
+				return
+			}
+		} else {
+			switch reflect.Kind(field.Type) {
+			case reflect.String:
+				err = c.writeReferenceFieldData(field.Type, v)
+				if err != nil {
+					return
+				}
+			default:
+				c.writeSimpleFieldData(v)
+			}
+		}
 	}
+
+	return
+
+}
+func (c *codec) writeSliceFieldData(t uint16, v reflect.Value) (data []byte, err error) {
+	sliceLength := v.Len()
+
+	if sliceLength > 0 {
+		c.PushMainBuffer()
+
+		var fakeField codecStructField
+		fakeField.Type = t
+
+		for i := 0; i < sliceLength; i++ {
+			c.writeFieldData(fakeField, v.Index(i))
+		}
+
+		data = c.PopMainBuffer()
+	} else {
+		data = []byte("")
+	}
+
+	return
+
 }
 
 func (c *codec) writeReferenceFieldData(t uint16, v reflect.Value) error {
 
-	id, err := c.putReference(v)
+	id, err := c.putReference(t, v)
 	if err != nil {
 		return err
 	}
