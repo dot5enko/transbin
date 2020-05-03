@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/dot5enko/transbin/utils"
-	"log"
 	"reflect"
 )
 
@@ -88,58 +87,23 @@ func (c *codec) reset() {
 	c.structureBuffer.Reset()
 }
 
-// todo reuse
-func (c *codec) PushMainBuffer() {
-
-	newBuffer := NewEncodeBuffer(defaultBufferSize, c.order)
-
-	c.buffers.PushBack(c.mainBuffer)
-	c.mainBuffer = newBuffer
-}
-
-func (c *codec) PopMainBuffer() []byte {
-	result := c.mainBuffer
-
-	prevBuffer := c.buffers.Back()
-	if prevBuffer == nil {
-		log.Printf("No pushed buffer were found\n")
-	}
-
-	c.mainBuffer = prevBuffer.Value.(*encode_buffer)
-
-	return result.Bytes()
-}
-
-func (c *codec) PushDecodeBuffer(data []byte) {
-
-	newBuffer := NewDecodeBuffer(c.order)
-	newBuffer.Init(data)
-
-	c.decode_buffers.PushBack(c.decodeBuffer)
-	c.decodeBuffer = newBuffer
-}
-
-func (c *codec) PopDecodeBuffer() {
-	prevBuffer := c.decode_buffers.Back()
-	if prevBuffer == nil {
-		log.Printf("No pushed buffer were found\n")
-	}
-
-	c.decodeBuffer = prevBuffer.Value.(*decode_buffer)
-}
-
 func (c *codec) putReference(t uint16, v reflect.Value) (reference uint16, err error) {
 
 	var refData []byte
 
 	if isArrayType(t) {
-		at :=getArrayElementType(t)
+		at := getArrayElementType(t)
 		c.useType(at)
 		refData, err = c.writeSliceFieldData(at, v)
+		if err != nil {
+			return
+		}
 	} else {
 		switch v.Kind() {
 		case reflect.String:
 			refData = []byte(v.String())
+		case reflect.Map:
+			refData, err = c.writeMapData(v)
 		default:
 			return 0, errors.New(fmt.Sprintf("Dont know how to reference such data type %s", v.Kind().String()))
 		}
@@ -199,7 +163,7 @@ func (c *codec) getTypeSize(t uint16) (int, error) {
 		switch reflect.Kind(t) {
 		case reflect.Bool, reflect.Uint8:
 			return 1, nil
-		case reflect.String, reflect.Slice: // reference types
+		case reflect.String, reflect.Slice, reflect.Map: // reference types
 			return 2, nil
 		case reflect.Uint16:
 			return 2, nil
@@ -230,7 +194,7 @@ func (c *codec) readArrayElement(elementType uint16, out reflect.Value) error {
 
 	arrayResult := reflect.MakeSlice(out.Type(), items, items)
 
-	c.PushDecodeBuffer(arrayData)
+	c.decodeBuffer.PushState(arrayData,0)
 
 	fakeField := codecStructField{}
 	fakeField.Type = elementType
@@ -238,9 +202,43 @@ func (c *codec) readArrayElement(elementType uint16, out reflect.Value) error {
 	for i := 0; i < items; i++ {
 		c.readFieldData(fakeField, arrayResult.Index(i))
 	}
-	c.PopDecodeBuffer()
+	c.decodeBuffer.PopState()
 
 	out.Set(arrayResult)
 
 	return nil
+}
+
+func (c *codec) readMapField(out reflect.Value) {
+	newMap := reflect.MakeMap(out.Type())
+
+	// reading field by field
+
+	out.Set(newMap)
+}
+
+func (c *codec) writeMapData(v reflect.Value) (result []byte, err error) {
+
+	length := v.Len()
+	if length > 255 {
+		err = utils.Error("Number of map fields of 255 overflow")
+	}
+
+	// number of fields
+	c.mainBuffer.WriteByte(uint8(length))
+
+	iter := v.MapRange()
+
+	for iter.Next() {
+
+		//keyValueStr := iter.Key().String()
+
+
+		c.mainBuffer.PushState(c.ref.buff.data,c.ref.buff.pos)
+		c.encodeToMainBuffer(iter.Value())
+		c.mainBuffer.PopState()
+	}
+
+
+	return
 }

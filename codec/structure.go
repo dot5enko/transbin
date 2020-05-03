@@ -45,7 +45,7 @@ func getArrayElementType(typeId uint16) uint16 {
 
 func (c *codec) registerStructure(ot reflect.Type) (*structDefinition, error) {
 
-	if (ot.Kind() == reflect.Ptr) {
+	if ot.Kind() == reflect.Ptr {
 		ot = ot.Elem()
 	}
 
@@ -113,8 +113,8 @@ func (c *codec) registerStructure(ot reflect.Type) (*structDefinition, error) {
 					ok = false
 					typeWithArrayFlag, ok = c.typeMap[getTypeCode(sliceElem)]
 					if !ok {
-						nested,err := c.registerStructure(sliceElem)
-						if (err != nil) {
+						nested, err := c.registerStructure(sliceElem)
+						if err != nil {
 							return nil, err
 						}
 

@@ -1,6 +1,7 @@
 package codec
 
 import (
+	"github.com/dot5enko/transbin/utils"
 	"reflect"
 )
 
@@ -10,6 +11,57 @@ func (c *codec) EncodeFull(obj interface{}) ([]byte, error) {
 func (c *codec) Encode(obj interface{}) ([]byte, error) {
 	return c.encodeInternal(obj, false)
 }
+func (c *codec) encodeToMainBuffer(o reflect.Value) (uint16,error) {
+
+	var writtenType uint16 = 0
+
+	t := o.Type()
+	if t.Kind() == reflect.Struct {
+
+		// general case when serializing object is a struct
+		generalStruct, err := c.registerStructure(t)
+		if err != nil {
+			return 0,err
+		}
+
+		// data id
+		c.mainBuffer.PutUint16(generalStruct.Id)
+
+		// data
+		err = c.writeComplexType(generalStruct.Id, o)
+		if err != nil {
+			return 0,err
+		}
+
+		writtenType = generalStruct.Id
+
+	} else if t.Kind() == reflect.Map {
+		// map
+		c.mainBuffer.PutUint16(uint16(reflect.Map))
+
+		// write map as a ref value cause it have dynamic length and no strict structure
+		_, err := c.putReference(uint16(reflect.Map), o)
+		if err != nil {
+			return 0,err
+		}
+
+		writtenType = uint16(reflect.Map)
+
+	} else {
+
+		// its a case for map value
+
+		err := c.writeSimpleFieldData(o)
+		if err != nil {
+			return 0,err
+		}
+
+		writtenType = uint16(t.Kind())
+
+	}
+
+	return writtenType,nil
+}
 
 func (c *codec) encodeInternal(obj interface{}, full bool) ([]byte, error) {
 
@@ -17,20 +69,7 @@ func (c *codec) encodeInternal(obj interface{}, full bool) ([]byte, error) {
 
 	o := reflect.Indirect(reflect.ValueOf(obj))
 
-	// generate structures
-	generalStruct, err := c.registerStructure(o.Type())
-	if err != nil {
-		return nil, err
-	}
-
-	// data id
-	c.mainBuffer.PutUint16(generalStruct.Id)
-
-	// data
-	err = c.writeComplexType(generalStruct.Id, o)
-	if err != nil {
-		return nil, err
-	}
+	c.encodeToMainBuffer(o)
 
 	// write structure
 	if full {
@@ -39,7 +78,7 @@ func (c *codec) encodeInternal(obj interface{}, full bool) ([]byte, error) {
 		c.encodeBuffer.WriteByte(0)
 	}
 
-	// write data to result
+	// actual data
 	c.encodeBuffer.Write(c.mainBuffer.Bytes())
 
 	// dynamic length data
@@ -48,7 +87,7 @@ func (c *codec) encodeInternal(obj interface{}, full bool) ([]byte, error) {
 	return c.encodeBuffer.Bytes(), nil
 }
 
-func (c *codec) writeSimpleFieldData(v reflect.Value) {
+func (c *codec) writeSimpleFieldData(v reflect.Value) error {
 
 	switch v.Kind() {
 	case reflect.Int32:
@@ -60,8 +99,10 @@ func (c *codec) writeSimpleFieldData(v reflect.Value) {
 	case reflect.Float64:
 		c.mainBuffer.PutFloat64(v.Interface().(float64))
 	default:
-		panic("no handler for writing simple type " + v.Kind().String())
+		return utils.Error("no handler for writing simple type %s", v.Kind().String())
 	}
+
+	return nil
 }
 
 func (c *codec) writeComplexType(t uint16, v reflect.Value) (err error) {
@@ -96,7 +137,7 @@ func (c *codec) writeFieldData(field codecStructField, v reflect.Value) (err err
 			}
 		} else {
 			switch reflect.Kind(field.Type) {
-			case reflect.String:
+			case reflect.String, reflect.Map:
 				err = c.writeReferenceFieldData(field.Type, v)
 				if err != nil {
 					return
@@ -114,7 +155,9 @@ func (c *codec) writeSliceFieldData(t uint16, v reflect.Value) (data []byte, err
 	sliceLength := v.Len()
 
 	if sliceLength > 0 {
-		c.PushMainBuffer()
+
+		data := make([]byte,512);
+		c.mainBuffer.PushState(data,0)
 
 		var fakeField codecStructField
 		fakeField.Type = t
@@ -123,7 +166,8 @@ func (c *codec) writeSliceFieldData(t uint16, v reflect.Value) (data []byte, err
 			c.writeFieldData(fakeField, v.Index(i))
 		}
 
-		data = c.PopMainBuffer()
+		data = data[:c.mainBuffer.pos]
+		c.mainBuffer.PopState()
 	} else {
 		data = []byte("")
 	}

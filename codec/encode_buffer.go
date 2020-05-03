@@ -1,15 +1,14 @@
 package codec
 
 import (
+	"container/list"
 	"encoding/binary"
 	"math"
 )
 
 type encode_buffer struct {
-	data  []byte
-	pos   int
-	size  int
-	order binary.ByteOrder
+	pop_buff
+	order  binary.ByteOrder
 }
 
 func NewEncodeBuffer(size int, order binary.ByteOrder) *encode_buffer {
@@ -20,6 +19,7 @@ func NewEncodeBuffer(size int, order binary.ByteOrder) *encode_buffer {
 	result.pos = 0
 	result.size = size
 	result.order = order
+	result.states = list.New()
 
 	return result
 }

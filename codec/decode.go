@@ -151,7 +151,7 @@ func (c *codec) readFieldData(field codecStructField, out reflect.Value) error {
 			return c.readComplexFieldData(field.Type, out)
 		} else {
 			switch reflect.Kind(field.Type) {
-			case reflect.String:
+			case reflect.String, reflect.Map:
 				return c.readReferenceFieldData(field.Type, out)
 			default:
 				return c.readSimpleFieldData(field.Type, out)
@@ -205,17 +205,18 @@ func (c *codec) readReferenceFieldData(t uint16, out reflect.Value) error {
 
 	c.decodeBuffer.ReadUint16(&c.dataBuffer.uint16val)
 
-	refBytes, length, err := c.ref.Reader.Get(uint64(c.dataBuffer.uint16val))
+	refBytes, _, err := c.ref.Reader.Get(uint64(c.dataBuffer.uint16val))
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("got ref bytes: = %s:%d. type = %d\n", refBytes, length, t)
-
 	switch t {
 	case uint16(reflect.String):
-	case uint16(reflect.Slice):
-
+		out.SetString(string(refBytes))
+	case uint16(reflect.Map):
+		c.decodeBuffer.PushState(refBytes,0)
+		c.readMapField(out)
+		c.decodeBuffer.PopState()
 		// string
 	default:
 		return errors.New(fmt.Sprintf("Unable to decode referenced type %d\n", t))

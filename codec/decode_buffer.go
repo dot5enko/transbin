@@ -6,8 +6,7 @@ import (
 )
 
 type decode_buffer struct {
-	data  []byte
-	pos   int
+	pop_buff
 	order binary.ByteOrder
 }
 

@@ -21,6 +21,8 @@ type TestStruct struct {
 	Id           int
 	Value        float32
 	NestedStruct []NStruct
+	MapVal       map[string]interface{}
+	StrVal       string
 }
 
 func PrintBenchmark(label string, result testing.BenchmarkResult) {
@@ -38,7 +40,11 @@ func main() {
 
 	toEncode.Id = 49
 	toEncode.Value = 32720.2383
+	toEncode.StrVal = "holaAmigo grande!"
 	//toEncode.Ids = []int32{99, 88, 77, 66, 55, 44, 33, 22, 11}
+
+	toEncode.MapVal = make(map[string]interface{})
+
 	ids := 3
 	toEncode.NestedStruct = make([]NStruct, ids)
 
@@ -64,17 +70,17 @@ func main() {
 
 	fmt.Printf("Got encoded data %d bytes length\n", len(encodedResult))
 
-	//decodedBack := TestStruct{}
-	//
-	////codec.Reporting = true
-	//err = c.Decode(&decodedBack, encodedResult)
-	//if err != nil {
-	//	panic(err)
-	//}
-	//
-	//jb, _ := json.Marshal(decodedBack)
-	//fmt.Printf("Got a result : %s\n", jb)
-	//return
+	decodedBack := TestStruct{}
+
+	//codec.Reporting = true
+	err = c.Decode(&decodedBack, encodedResult)
+	if err != nil {
+		panic(err)
+	}
+
+	jb, _ := json.Marshal(decodedBack)
+	fmt.Printf("Got a result : %s\n", jb)
+	return
 
 	//return
 	PrintBenchmark("binary full encode", testing.Benchmark(func(b *testing.B) {
