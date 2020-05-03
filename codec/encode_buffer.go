@@ -8,7 +8,7 @@ import (
 
 type encode_buffer struct {
 	pop_buff
-	order  binary.ByteOrder
+	order binary.ByteOrder
 }
 
 func NewEncodeBuffer(size int, order binary.ByteOrder) *encode_buffer {

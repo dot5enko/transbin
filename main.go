@@ -45,6 +45,9 @@ func main() {
 
 	toEncode.MapVal = make(map[string]interface{})
 
+	toEncode.MapVal["int"] = 5
+	toEncode.MapVal["name"] = "serhii"
+
 	ids := 3
 	toEncode.NestedStruct = make([]NStruct, ids)
 

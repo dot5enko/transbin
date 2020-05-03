@@ -3,21 +3,21 @@ package codec
 import "container/list"
 
 type pop_buff struct {
-	data  []byte
-	pos   int
+	data []byte
+	pos  int
 	size int
 
 	states *list.List
 }
 
 type BufferState struct {
-	pos int
+	pos  int
 	size int
-	ref []byte
+	ref  []byte
 }
 
-func (this *pop_buff) PushState(data []byte,at int) {
-	this.states.PushBack(BufferState{pos:this.pos,size:this.size,ref:this.data})
+func (this *pop_buff) PushState(data []byte, at int) {
+	this.states.PushBack(BufferState{pos: this.pos, size: this.size, ref: this.data})
 
 	this.data = data
 	this.pos = at
@@ -26,8 +26,8 @@ func (this *pop_buff) PushState(data []byte,at int) {
 
 func (this *pop_buff) PopState() {
 
-	el :=this.states.Back()
-	if (el != nil) {
+	el := this.states.Back()
+	if el != nil {
 		this.states.Remove(el)
 	}
 	prevState := el.Value.(BufferState)
@@ -36,4 +36,3 @@ func (this *pop_buff) PopState() {
 	this.pos = prevState.pos
 	this.size = prevState.size
 }
-

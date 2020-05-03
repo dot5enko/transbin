@@ -214,10 +214,7 @@ func (c *codec) readReferenceFieldData(t uint16, out reflect.Value) error {
 	case uint16(reflect.String):
 		out.SetString(string(refBytes))
 	case uint16(reflect.Map):
-		c.decodeBuffer.PushState(refBytes,0)
-		c.readMapField(out)
-		c.decodeBuffer.PopState()
-		// string
+		c.readMapField(refBytes, out)
 	default:
 		return errors.New(fmt.Sprintf("Unable to decode referenced type %d\n", t))
 	}

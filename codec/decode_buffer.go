@@ -1,6 +1,7 @@
 package codec
 
 import (
+	"container/list"
 	"encoding/binary"
 	"math"
 )
@@ -11,7 +12,11 @@ type decode_buffer struct {
 }
 
 func NewDecodeBuffer(order binary.ByteOrder) *decode_buffer {
-	return &decode_buffer{order: order}
+
+	result := &decode_buffer{order: order}
+	result.states = list.New()
+
+	return result
 }
 
 func (this *decode_buffer) Init(b []byte) {
