@@ -16,7 +16,8 @@ type BufferState struct {
 }
 
 func (this *pop_buff) InitStack() {
-	this.states = make([]BufferState,10)
+	// todo resize
+	this.states = make([]BufferState, 10)
 	this.statesPos = 0
 }
 

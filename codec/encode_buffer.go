@@ -19,7 +19,7 @@ func NewEncodeBuffer(size int, order binary.ByteOrder) *encode_buffer {
 	result.size = size
 	result.order = order
 
-	result.InitStack();
+	result.InitStack()
 
 	return result
 }

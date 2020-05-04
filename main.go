@@ -9,12 +9,12 @@ import (
 )
 
 type ProductVal struct {
-	Name string
+	Name  string
 	Price float64
 }
 
 type MapValStruct struct {
-	Int int
+	Int  int
 	Name string
 }
 
@@ -25,7 +25,7 @@ type NStruct struct {
 	N5      int
 	Floa    float64
 	Fl2     float64
-	Product  ProductVal
+	Product ProductVal
 }
 
 type TestStruct struct {
@@ -68,8 +68,8 @@ func main() {
 		toEncode.NestedStruct[i].Floa = 28973892.3833
 		toEncode.NestedStruct[i].Fl2 = 99.98765432
 
-		toEncode.NestedStruct[i].Product.Price = 10.95;
-		toEncode.NestedStruct[i].Product.Name = "json binary self describing proto";
+		toEncode.NestedStruct[i].Product.Price = 10.95
+		toEncode.NestedStruct[i].Product.Name = "json binary self describing proto"
 
 	}
 

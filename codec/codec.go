@@ -2,7 +2,6 @@ package codec
 
 import (
 	"bytes"
-	"container/list"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -20,16 +19,14 @@ type codec struct {
 	typeMap    map[string]uint16
 
 	// state
-	mainBuffer      *encode_buffer
-	ref             *references
-	usedTypes       *DynamicArray
+	mainBuffer *encode_buffer
+	ref        *references
+	usedTypes  *DynamicArray
+
 	encodeBuffer    *bytes.Buffer
 	structureBuffer *encode_buffer
 
-	decode_buffers *list.List
-	decodeBuffer   *decode_buffer
-
-	buffers *list.List
+	decodeBuffer *decode_buffer
 
 	dataBuffer struct {
 		byte       uint8
@@ -54,12 +51,10 @@ func NewCodec() (*codec, error) {
 	// state
 
 	// main buffer and pushed one
-	result.buffers = list.New()
 	result.mainBuffer = NewEncodeBuffer(512, result.order)
 	result.encodeBuffer = new(bytes.Buffer)
 
 	//
-	result.decode_buffers = list.New()
 	result.decodeBuffer = NewDecodeBuffer(result.order)
 
 	//
@@ -184,7 +179,7 @@ func (c *codec) getTypeSize(t uint16) (int, error) {
 		case reflect.Map:
 			return 2 /* reference to data id*/ + 2 /*element type*/ + 2 /*elements count*/, nil
 		default:
-			return 0, fmt.Errorf("Unable to get a type length for type %s: %d", reflect.Kind(t), t)
+			return 0, fmt.Errorf("Unable to get a type length for type %s: %d", reflect.Kind(t).String(), t)
 		}
 	}
 }
@@ -222,7 +217,7 @@ func (c *codec) readArrayElement(elementType uint16, out reflect.Value) error {
 
 func (c *codec) readMapField(interfaceElemType uint16, keyType uint16, refBytes []byte, out reflect.Value) error {
 
-	dataLen := len(refBytes);
+	dataLen := len(refBytes)
 
 	c.decodeBuffer.PushState(refBytes, 0)
 
@@ -237,31 +232,31 @@ func (c *codec) readMapField(interfaceElemType uint16, keyType uint16, refBytes 
 	keySize, err := c.getTypeSize(keyType)
 	elemSize += keySize
 
-	elems := dataLen/elemSize
+	elems := dataLen / elemSize
 
-	values := reflect.MakeSlice(reflect.SliceOf(out.Type().Elem()),elems,elems)
-	keys := reflect.MakeSlice(reflect.SliceOf(out.Type().Key()),elems,elems)
+	values := reflect.MakeSlice(reflect.SliceOf(out.Type().Elem()), elems, elems)
+	keys := reflect.MakeSlice(reflect.SliceOf(out.Type().Key()), elems, elems)
 
 	fakeKeyField := codecStructField{}
 	fakeKeyField.Type = keyType
 
-	for i:= 0 ; i < elems; i++ {
+	for i := 0; i < elems; i++ {
 		// read key
 		fakeKeyField.Type = keyType
-		err := c.readFieldData(fakeKeyField,keys.Index(i))
+		err := c.readFieldData(fakeKeyField, keys.Index(i))
 
-		if (err != nil) {
+		if err != nil {
 			return err
 		}
 
 		// read value
 		fakeKeyField.Type = interfaceElemType
-		err = c.readFieldData(fakeKeyField,values.Index(i))
-		if (err != nil) {
+		err = c.readFieldData(fakeKeyField, values.Index(i))
+		if err != nil {
 			return err
 		}
 
-		newMap.SetMapIndex(keys.Index(i),values.Index(i))
+		newMap.SetMapIndex(keys.Index(i), values.Index(i))
 	}
 
 	out.Set(newMap)

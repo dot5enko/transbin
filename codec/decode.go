@@ -168,7 +168,7 @@ func (c *codec) readSimpleFieldData(t uint16, out reflect.Value) error {
 	tmpVal := reflect.Indirect(out)
 
 	switch reflect.Kind(t) {
-	case reflect.Int,reflect.Int32:
+	case reflect.Int, reflect.Int32:
 		err := c.decodeBuffer.ReadInt32(&c.dataBuffer.int32val)
 
 		if err != nil {
@@ -179,21 +179,24 @@ func (c *codec) readSimpleFieldData(t uint16, out reflect.Value) error {
 
 			val := int64(c.dataBuffer.int32val)
 
-			if (tmpVal.Kind() == reflect.Interface) {
+			if tmpVal.Kind() == reflect.Interface {
 				tmpVal.Set(reflect.ValueOf(val))
 			} else {
 				tmpVal.SetInt(val)
 			}
 		} else {
-			return errors.New(fmt.Sprintf("Cant set value on field of type %d\n", t))
+			return utils.Error("Cant set value on field of type %d\n", t)
 		}
 	case reflect.Float64:
 		c.decodeBuffer.ReadFloat64(&c.dataBuffer.float64val)
 		if tmpVal.CanSet() {
-			if (tmpVal.Kind() == reflect.Interface) {
-				tmpVal.Set(reflect.ValueOf(float64(c.dataBuffer.float64val)))
+
+			val := float64(c.dataBuffer.float64val)
+
+			if tmpVal.Kind() == reflect.Interface {
+				tmpVal.Set(reflect.ValueOf(val))
 			} else {
-				tmpVal.SetFloat(float64(c.dataBuffer.float64val))
+				tmpVal.SetFloat(val)
 			}
 		} else {
 			return errors.New("unable to set float32 value of unaccessable field")
@@ -203,7 +206,7 @@ func (c *codec) readSimpleFieldData(t uint16, out reflect.Value) error {
 		c.decodeBuffer.ReadFloat32(&c.dataBuffer.float32val)
 		if tmpVal.CanSet() {
 
-			if (tmpVal.Kind() == reflect.Interface) {
+			if tmpVal.Kind() == reflect.Interface {
 				tmpVal.Set(reflect.ValueOf(float64(c.dataBuffer.float32val)))
 			} else {
 				tmpVal.SetFloat(float64(c.dataBuffer.float32val))
@@ -230,7 +233,7 @@ func (c *codec) readReferenceFieldData(t uint16, out reflect.Value) error {
 			return err
 		}
 
-		if (out.Kind() == reflect.Interface) {
+		if out.Kind() == reflect.Interface {
 			out.Set(reflect.ValueOf(string(refBytes)))
 		} else {
 			out.SetString(string(refBytes))
@@ -266,8 +269,8 @@ func (c *codec) readReferenceFieldData(t uint16, out reflect.Value) error {
 		fakeField := codecStructField{}
 		fakeField.Type = interfaceType
 
-		c.decodeBuffer.PushState(refBytes,0)
-		c.readFieldData(fakeField,out)
+		c.decodeBuffer.PushState(refBytes, 0)
+		c.readFieldData(fakeField, out)
 		c.decodeBuffer.PopState()
 	default:
 		return utils.Error("Unable to decode referenced type: %s\n", reflect.Kind(t).String())
@@ -286,7 +289,7 @@ func (c *codec) readComplexFieldData(t uint16, out reflect.Value) (err error) {
 
 	tData, ok := c.types[t]
 	if !ok {
-		return errors.New(fmt.Sprintf("No structure data in coded on how to decode %d type", t))
+		return utils.Error("No structure data in coded on how to decode %d type", t)
 	}
 
 	for i := 0; i < int(tData.FieldCount); i++ {

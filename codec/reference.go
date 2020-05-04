@@ -58,7 +58,7 @@ func (this *references_reader) Init(data []byte) {
 }
 
 func (this *references_reader) Reset() {
-	this.buffer.pop_buff.Reset();
+	this.buffer.pop_buff.Reset()
 	this.refsCount = 0
 	this.dataLength = 0
 }
@@ -76,7 +76,7 @@ func NewReferencesHandler(addressWidth int, order binary.ByteOrder) (*references
 	result := &references{}
 
 	if addressWidth%8 != 0 {
-		return nil, errors.New("Adress width should be a multiply of 8")
+		return nil, utils.Error("Adress width should be a multiply of 8")
 	}
 
 	result.order = order
@@ -125,7 +125,7 @@ func (this *references) Reset() {
 	this.buff.Reset()
 	this.count = 1
 	this.Reader.refsCount = 0
-	this.Reader.Reset();
+	this.Reader.Reset()
 }
 
 func (c *codec) writeArrayLikeData(v reflect.Value, parent_buf *encode_buffer, cb func(n int, v reflect.Value, b *encode_buffer) error) (sliceLength int, err error) {
@@ -142,13 +142,12 @@ func (c *codec) writeArrayLikeData(v reflect.Value, parent_buf *encode_buffer, c
 	sizeOfElement, _ = c.getTypeSize(t)
 
 	if v.Kind() == reflect.Map {
-		keyType,err := c.getType(v.Type().Key())
-		if (err != nil) {
-			return 0,err
+		keyType, err := c.getType(v.Type().Key())
+		if err != nil {
+			return 0, err
 		}
-		sizeOfKey,_ := c.getTypeSize(keyType)
+		sizeOfKey, _ := c.getTypeSize(keyType)
 		sizeOfElement += sizeOfKey
-
 
 	}
 
@@ -246,7 +245,7 @@ func (c *codec) putReference(buffer *encode_buffer, t uint16, v reflect.Value) (
 			// type of key
 			buffer.PutUint16(typeOfMapKey)
 
-			_,err = c.writeArrayLikeData(v, buffer, func(n int, v0 reflect.Value, b *encode_buffer) error {
+			_, err = c.writeArrayLikeData(v, buffer, func(n int, v0 reflect.Value, b *encode_buffer) error {
 
 				iter := v0.MapRange()
 

@@ -27,6 +27,8 @@ type codecStructField struct {
 }
 
 func getTypeCode(ot reflect.Type) string {
+	// todo use string builder
+	// this code escapes to heap
 	return ot.PkgPath() + "." + ot.Name()
 }
 
