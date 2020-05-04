@@ -140,7 +140,12 @@ func (c *codec) getType(p reflect.Type) (uint16, error) {
 		}
 
 		return tref, nil
-
+	case reflect.Slice:
+		t, err := c.getType(p.Elem())
+		if err != nil {
+			return 0, err
+		}
+		return setArrayTypeFlag(t), nil
 	default:
 
 		return t, nil
@@ -168,14 +173,16 @@ func (c *codec) getTypeSize(t uint16) (int, error) {
 		switch reflect.Kind(t) {
 		case reflect.Bool, reflect.Uint8:
 			return 1, nil
-		case reflect.String, reflect.Slice, reflect.Map, reflect.Interface: // reference types
+		case reflect.String, reflect.Slice: // reference types
 			return 2, nil
 		case reflect.Uint16:
 			return 2, nil
-		case reflect.Float32, reflect.Int32, reflect.Uint, reflect.Int, reflect.Uint32, reflect.Uintptr:
+		case reflect.Float32, reflect.Int32, reflect.Uint, reflect.Int, reflect.Uint32, reflect.Uintptr, reflect.Interface:
 			return 4, nil
 		case reflect.Float64, reflect.Int64, reflect.Uint64:
 			return 8, nil
+		case reflect.Map:
+			return 2 /* reference to data id*/ + 2 /*element type*/ + 2 /*elements count*/, nil
 		default:
 			return 0, fmt.Errorf("Unable to get a type length for type %s: %d", reflect.Kind(t), t)
 		}
@@ -213,68 +220,48 @@ func (c *codec) readArrayElement(elementType uint16, out reflect.Value) error {
 	return nil
 }
 
-func (c *codec) readMapField(refBytes []byte, out reflect.Value) error {
+func (c *codec) readMapField(interfaceElemType uint16, keyType uint16, refBytes []byte, out reflect.Value) error {
+
+	dataLen := len(refBytes);
+
 	c.decodeBuffer.PushState(refBytes, 0)
+
 	newMap := reflect.MakeMap(out.Type())
 
-	var interfaceElemType uint16
-	c.decodeBuffer.ReadUint16(&interfaceElemType)
 	// type of interface element
-
-	mapElement := out.Type().Elem()
-	interfaceObj := reflect.New(mapElement)
-
-	if (interfaceElemType > internalTypesCount) {
-
-	} else {
-		switch (reflect.Kind(interfaceElemType)) {
-		case reflect.Interface:
-
-			c.decodeBuffer.ReadUint16(&c.dataBuffer.uint16val)
-			refData, _,err := c.ref.Reader.Get(uint64(c.dataBuffer.uint16val))
-			if (err != nil) {
-					return err
-			}
-
-
-			//
-			return utils.Error("continue here %p",refData)
-
-
-		default:
-			return utils.Error("type for map element not found: %s\n",reflect.Kind(interfaceElemType).String())
-		}
-	}
-
-
-	fmt.Printf("got map[]%s eleemnt type %s : %s -> %s\n",c.dataBuffer.uint16val, interfaceObj.Kind().String(), mapElement.String(), interfaceObj)
-
-	interfaceObj.Set(reflect.ValueOf("string"))
-
-	panic("!")
-
-	// reading field by field
-	totalBytes := len(refBytes) - 2
-
-	// read type
-	var typeOfElem uint16
-	c.decodeBuffer.ReadUint16(&typeOfElem)
-
-	typeSize, err := c.getTypeSize(typeOfElem)
+	elemSize, err := c.getTypeSize(interfaceElemType)
 	if err != nil {
 		return err
 	}
 
-	var elementsCount int = totalBytes / typeSize
+	keySize, err := c.getTypeSize(keyType)
+	elemSize += keySize
 
-	for i := 0; i < elementsCount; i++ {
-		nameLen, _ := c.decodeBuffer.ReadByte()
-		c.decodeBuffer.Read(c.dataBuffer.nameReader[:nameLen])
+	elems := dataLen/elemSize
 
-		mapKey := reflect.ValueOf(string(c.dataBuffer.nameReader[:nameLen]))
-		//mapValue := reflect.
+	values := reflect.MakeSlice(reflect.SliceOf(out.Type().Elem()),elems,elems)
+	keys := reflect.MakeSlice(reflect.SliceOf(out.Type().Key()),elems,elems)
 
-		newMap.SetMapIndex(mapKey, reflect.ValueOf(nil))
+	fakeKeyField := codecStructField{}
+	fakeKeyField.Type = keyType
+
+	for i:= 0 ; i < elems; i++ {
+		// read key
+		fakeKeyField.Type = keyType
+		err := c.readFieldData(fakeKeyField,keys.Index(i))
+
+		if (err != nil) {
+			return err
+		}
+
+		// read value
+		fakeKeyField.Type = interfaceElemType
+		err = c.readFieldData(fakeKeyField,values.Index(i))
+		if (err != nil) {
+			return err
+		}
+
+		newMap.SetMapIndex(keys.Index(i),values.Index(i))
 	}
 
 	out.Set(newMap)

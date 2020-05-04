@@ -151,7 +151,7 @@ func (c *codec) readFieldData(field codecStructField, out reflect.Value) error {
 			return c.readComplexFieldData(field.Type, out)
 		} else {
 			switch reflect.Kind(field.Type) {
-			case reflect.String, reflect.Map:
+			case reflect.String, reflect.Map, reflect.Interface:
 				return c.readReferenceFieldData(field.Type, out)
 			default:
 				return c.readSimpleFieldData(field.Type, out)
@@ -160,13 +160,15 @@ func (c *codec) readFieldData(field codecStructField, out reflect.Value) error {
 		}
 	}
 }
-
+func setInterface(acceptor reflect.Value, value interface{}) {
+	acceptor.Set(reflect.ValueOf(value))
+}
 func (c *codec) readSimpleFieldData(t uint16, out reflect.Value) error {
 
 	tmpVal := reflect.Indirect(out)
 
-	switch t {
-	case uint16(reflect.Int), uint16(reflect.Int32):
+	switch reflect.Kind(t) {
+	case reflect.Int,reflect.Int32:
 		err := c.decodeBuffer.ReadInt32(&c.dataBuffer.int32val)
 
 		if err != nil {
@@ -174,22 +176,38 @@ func (c *codec) readSimpleFieldData(t uint16, out reflect.Value) error {
 		}
 
 		if tmpVal.CanSet() {
-			tmpVal.SetInt(int64(c.dataBuffer.int32val))
+
+			val := int64(c.dataBuffer.int32val)
+
+			if (tmpVal.Kind() == reflect.Interface) {
+				tmpVal.Set(reflect.ValueOf(val))
+			} else {
+				tmpVal.SetInt(val)
+			}
 		} else {
 			return errors.New(fmt.Sprintf("Cant set value on field of type %d\n", t))
 		}
-	case uint16(reflect.Float64):
+	case reflect.Float64:
 		c.decodeBuffer.ReadFloat64(&c.dataBuffer.float64val)
 		if tmpVal.CanSet() {
-			tmpVal.SetFloat(float64(c.dataBuffer.float64val))
+			if (tmpVal.Kind() == reflect.Interface) {
+				tmpVal.Set(reflect.ValueOf(float64(c.dataBuffer.float64val)))
+			} else {
+				tmpVal.SetFloat(float64(c.dataBuffer.float64val))
+			}
 		} else {
 			return errors.New("unable to set float32 value of unaccessable field")
 		}
-	case uint16(reflect.Float32):
+	case reflect.Float32:
 
 		c.decodeBuffer.ReadFloat32(&c.dataBuffer.float32val)
 		if tmpVal.CanSet() {
-			tmpVal.SetFloat(float64(c.dataBuffer.float32val))
+
+			if (tmpVal.Kind() == reflect.Interface) {
+				tmpVal.Set(reflect.ValueOf(float64(c.dataBuffer.float32val)))
+			} else {
+				tmpVal.SetFloat(float64(c.dataBuffer.float32val))
+			}
 		} else {
 			return errors.New("unable to set float32 value of unaccessable field")
 		}
@@ -203,20 +221,56 @@ func (c *codec) readSimpleFieldData(t uint16, out reflect.Value) error {
 
 func (c *codec) readReferenceFieldData(t uint16, out reflect.Value) error {
 
-	c.decodeBuffer.ReadUint16(&c.dataBuffer.uint16val)
+	switch reflect.Kind(t) {
+	case reflect.String:
+		c.decodeBuffer.ReadUint16(&c.dataBuffer.uint16val)
 
-	refBytes, _, err := c.ref.Reader.Get(uint64(c.dataBuffer.uint16val))
-	if err != nil {
-		return err
-	}
+		refBytes, _, err := c.ref.Reader.Get(uint64(c.dataBuffer.uint16val))
+		if err != nil {
+			return err
+		}
 
-	switch t {
-	case uint16(reflect.String):
-		out.SetString(string(refBytes))
-	case uint16(reflect.Map):
-		c.readMapField(refBytes, out)
+		if (out.Kind() == reflect.Interface) {
+			out.Set(reflect.ValueOf(string(refBytes)))
+		} else {
+			out.SetString(string(refBytes))
+		}
+	case reflect.Map:
+
+		var elType uint16
+		var keyType uint16
+
+		c.decodeBuffer.ReadUint16(&elType)
+		c.decodeBuffer.ReadUint16(&keyType)
+
+		c.decodeBuffer.ReadUint16(&c.dataBuffer.uint16val)
+
+		refBytes, _, err := c.ref.Reader.Get(uint64(c.dataBuffer.uint16val))
+		if err != nil {
+			return err
+		}
+		err = c.readMapField(elType, keyType, refBytes, out)
+		if err != nil {
+			return err
+		}
+	case reflect.Interface:
+
+		var interfaceType uint16
+		c.decodeBuffer.ReadUint16(&interfaceType)
+		c.decodeBuffer.ReadUint16(&c.dataBuffer.uint16val)
+
+		refBytes, _, err := c.ref.Reader.Get(uint64(c.dataBuffer.uint16val))
+		if err != nil {
+			return err
+		}
+		fakeField := codecStructField{}
+		fakeField.Type = interfaceType
+
+		c.decodeBuffer.PushState(refBytes,0)
+		c.readFieldData(fakeField,out)
+		c.decodeBuffer.PopState()
 	default:
-		return errors.New(fmt.Sprintf("Unable to decode referenced type %d\n", t))
+		return utils.Error("Unable to decode referenced type: %s\n", reflect.Kind(t).String())
 	}
 
 	return nil

@@ -37,10 +37,10 @@ func (c *codec) encodeToBuffer(buffer *encode_buffer, o reflect.Value) (uint16, 
 
 	} else if t.Kind() == reflect.Map {
 		// map
-		c.mainBuffer.PutUint16(uint16(reflect.Map))
+		buffer.PutUint16(uint16(reflect.Map))
 
 		// write map as a ref value cause it have dynamic length and no strict structure
-		_, err := c.putReference(uint16(reflect.Map), o)
+		_, err := c.putReference(buffer, uint16(reflect.Map), o)
 		if err != nil {
 			return 0, err
 		}
@@ -165,7 +165,7 @@ func (c *codec) writeFieldData(buffer *encode_buffer, field codecStructField, v 
 
 func (c *codec) writeReferenceFieldData(buffer *encode_buffer, t uint16, v reflect.Value) error {
 
-	id, err := c.putReference(t, v)
+	id, err := c.putReference(buffer, t, v)
 	if err != nil {
 		return err
 	}

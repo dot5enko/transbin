@@ -121,18 +121,30 @@ func (this *references) Reset() {
 	this.Reader.refsCount = 0
 }
 
-func (c *codec) writeArrayLikeData(v reflect.Value, cb func(n int, v reflect.Value, buffer *encode_buffer) error) (err error) {
-	sliceLength := v.Len()
+func (c *codec) writeArrayLikeData(v reflect.Value, parent_buf *encode_buffer, cb func(n int, v reflect.Value, b *encode_buffer) error) (sliceLength int, err error) {
+	sliceLength = v.Len()
 
-	t, err := c.getType(v.Type().Elem())
+	var t uint16
+	t, err = c.getType(v.Type().Elem())
 	if err != nil {
-		return err
+		return
 	}
 
-	sizeOfElement, err := c.getTypeSize(t)
-	if err != nil {
-		return err
+	var sizeOfElement int
+
+	sizeOfElement, _ = c.getTypeSize(t)
+
+	if v.Kind() == reflect.Map {
+		keyType,err := c.getType(v.Type().Key())
+		if (err != nil) {
+			return 0,err
+		}
+		sizeOfKey,_ := c.getTypeSize(keyType)
+		sizeOfElement += sizeOfKey
+
+
 	}
+
 	allocate := (sliceLength * sizeOfElement)
 
 	// ref size
@@ -142,30 +154,30 @@ func (c *codec) writeArrayLikeData(v reflect.Value, cb func(n int, v reflect.Val
 	// keeping allocated bytes for writing
 	c.ref.buff.Next(allocate)
 
-	c.mainBuffer.PushState(c.ref.buff.data[curPos:], 0)
+	parent_buf.PushState(c.ref.buff.data[curPos:], 0)
 	if sliceLength > 0 {
 		err = cb(sliceLength, v, c.mainBuffer)
 	} else {
 
 	}
-	c.mainBuffer.PopState()
+	parent_buf.PopState()
 
-	return err
+	return
 }
 
-func (c *codec) putReference(t uint16, v reflect.Value) (reference uint16, err error) {
+func (c *codec) putReference(buffer *encode_buffer, t uint16, v reflect.Value) (reference uint16, err error) {
 
 	reference = uint16(c.ref.GetId())
 
 	if isArrayType(t) {
 		at := getArrayElementType(t)
 		c.useType(at)
-		err = c.writeArrayLikeData(v, func(n int, v0 reflect.Value, buffer *encode_buffer) error {
+		_, err = c.writeArrayLikeData(v, buffer, func(n int, v0 reflect.Value, b *encode_buffer) error {
 			var fakeField codecStructField
 			fakeField.Type = at
 
 			for i := 0; i < n; i++ {
-				err = c.writeFieldData(buffer, fakeField, v0.Index(i))
+				err = c.writeFieldData(b, fakeField, v0.Index(i))
 				if err != nil {
 					return err
 				}
@@ -182,54 +194,67 @@ func (c *codec) putReference(t uint16, v reflect.Value) (reference uint16, err e
 		case reflect.String:
 			err = c.ref.Put([]byte(v.String()))
 		case reflect.Interface:
+			// [type of ref data;2b;][ref id; 2b]
+
+			interfaceActualData := v.Elem()
+
 			var tCode uint16
-			tCode,err = c.getType(v.Elem().Type())
-			if (err != nil) {
+			tCode, err = c.getType(interfaceActualData.Type())
+			if err != nil {
 				return
 			}
 
-			allocate,_ := c.getTypeSize(tCode)
-
-			refSize := uint16(allocate + 2)
-			c.ref.buff.PutUint16(refSize)
-
 			// put type of referenced object
-			c.ref.buff.PutUint16(tCode)
+			buffer.PutUint16(tCode)
+
+			// allocated size in references for actual data
+			allocate, _ := c.getTypeSize(tCode)
+			c.ref.buff.PutUint16(uint16(allocate))
 			oldPos := c.ref.buff.pos
+
+			// skip allocated data
 			c.ref.buff.Next(allocate)
 
-			c.mainBuffer.PushState(c.ref.buff.data[oldPos:],0)
+			// use allocated data
+			c.mainBuffer.PushState(c.ref.buff.data[oldPos:], 0)
 			// put referenced object
-			_, err = c.encodeToBuffer(c.mainBuffer, v.Elem())
+			_, err = c.encodeToBuffer(c.mainBuffer, interfaceActualData)
+			// use buffer's data
 			c.mainBuffer.PopState()
 
 		case reflect.Map:
-			err = c.writeArrayLikeData(v, func(n int, v0 reflect.Value, buffer *encode_buffer) error {
-				typeOfMap, err := c.getType(v.Type().Elem())
-				if err != nil {
-					return err
-				}
 
-				// put value type
-				buffer.PutUint16(typeOfMap)
+			// [element type;2b][key type;2b][reference id; 2b] ... [name len;N;1b;][name bytes;Nb][fieldData;Xb]
+
+			typeOfMap, err := c.getType(v.Type().Elem())
+			typeOfMapKey, err := c.getType(v.Type().Key())
+
+			if err != nil {
+				return 0, err
+			}
+
+			// type of element
+			buffer.PutUint16(typeOfMap)
+
+			// type of key
+			buffer.PutUint16(typeOfMapKey)
+
+			_,err = c.writeArrayLikeData(v, buffer, func(n int, v0 reflect.Value, b *encode_buffer) error {
 
 				iter := v0.MapRange()
 
 				for iter.Next() {
-					name := iter.Key().String()
-
-					// name field lenth and bytes
-					buffer.WriteByte(uint8(len(name)))
-					buffer.Write([]byte(name))
-
-					_, err := c.encodeToBuffer(buffer, iter.Value())
+					_, err = c.encodeToBuffer(b, iter.Key())
+					if err != nil {
+						return err
+					}
+					_, err = c.encodeToBuffer(b, iter.Value())
 					if err != nil {
 						return err
 					}
 				}
 
 				return nil
-
 			})
 		default:
 			return 0, errors.New(fmt.Sprintf("Dont know how to reference such data type %s", v.Kind().String()))

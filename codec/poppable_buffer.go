@@ -1,6 +1,8 @@
 package codec
 
-import "container/list"
+import (
+	"container/list"
+)
 
 type pop_buff struct {
 	data []byte
@@ -17,6 +19,7 @@ type BufferState struct {
 }
 
 func (this *pop_buff) PushState(data []byte, at int) {
+
 	this.states.PushBack(BufferState{pos: this.pos, size: this.size, ref: this.data})
 
 	this.data = data
@@ -35,4 +38,8 @@ func (this *pop_buff) PopState() {
 	this.data = prevState.ref
 	this.pos = prevState.pos
 	this.size = prevState.size
+}
+
+func (this *pop_buff) InPushedState() bool {
+	return this.states.Len() > 0
 }
