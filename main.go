@@ -72,9 +72,14 @@ func main() {
 		toEncode.NestedStruct[i].Product.Name = "json binary self describing proto"
 
 	}
+	//
+	//toEncode := make(map[string]interface{})
+	//
+	//toEncode["name"] = "serhii"
+	//toEncode["price"] = 500.99
 
 	jb0, _ := json.Marshal(toEncode)
-	fmt.Printf("Bef a result : %s\n", jb0)
+	fmt.Printf("Bef a result : %s[%d]\n", jb0, len(jb0))
 
 	var encodedFull []byte
 	c, _ := codec.NewCodec()
@@ -86,8 +91,8 @@ func main() {
 
 	fmt.Printf("Got encoded data %d bytes length\n", len(encodedResult))
 
+	////decodedBack := make(map[string]interface{})
 	//decodedBack := TestStruct{}
-	//
 	////codec.Reporting = true
 	//err = c.Decode(&decodedBack, encodedResult)
 	//if err != nil {

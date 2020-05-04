@@ -11,21 +11,21 @@ func (c *codec) EncodeFull(obj interface{}) ([]byte, error) {
 func (c *codec) Encode(obj interface{}) ([]byte, error) {
 	return c.encodeInternal(obj, false)
 }
-func (c *codec) encodeToBuffer(buffer *encode_buffer, o reflect.Value) (uint16, error) {
+func (c *codec) encodeElementToBuffer(buffer *encode_buffer, o reflect.Value) (uint16, error) {
 
 	var writtenType uint16 = 0
 
 	t := o.Type()
-	if t.Kind() == reflect.Struct {
+
+	switch t.Kind() {
+
+	case reflect.Struct:
 
 		// general case when serializing object is a struct
 		generalStruct, err := c.registerStructure(t)
 		if err != nil {
 			return 0, err
 		}
-
-		// data id
-		buffer.PutUint16(generalStruct.Id)
 
 		// data
 		err = c.writeComplexType(buffer, generalStruct.Id, o)
@@ -35,19 +35,19 @@ func (c *codec) encodeToBuffer(buffer *encode_buffer, o reflect.Value) (uint16, 
 
 		writtenType = generalStruct.Id
 
-	} else if t.Kind() == reflect.Map {
-		// map
-		buffer.PutUint16(uint16(reflect.Map))
+	case reflect.Map:
 
-		// write map as a ref value cause it have dynamic length and no strict structure
-		_, err := c.putReference(buffer, uint16(reflect.Map), o)
+		fakeField := codecStructField{}
+		fakeField.Type = uint16(reflect.Map)
+		err := c.writeFieldData(buffer, fakeField, o)
 		if err != nil {
 			return 0, err
 		}
 
 		writtenType = uint16(reflect.Map)
-
-	} else {
+	case reflect.Array:
+		panic("don't know how to write arary")
+	default:
 		// its a case for map value
 		var err error
 
@@ -75,7 +75,14 @@ func (c *codec) encodeInternal(obj interface{}, full bool) ([]byte, error) {
 
 	o := reflect.Indirect(reflect.ValueOf(obj))
 
-	_, err := c.encodeToBuffer(c.mainBuffer, o)
+	// allocate 2 bytes for element type
+	c.mainBuffer.Next(2)
+
+	typeId, err := c.encodeElementToBuffer(c.mainBuffer, o)
+
+	c.mainBuffer.PushState(c.mainBuffer.data, 0)
+	c.mainBuffer.PutUint16(typeId)
+	c.mainBuffer.PopState()
 
 	if err != nil {
 		return nil, err

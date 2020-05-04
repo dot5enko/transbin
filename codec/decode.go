@@ -137,6 +137,10 @@ func (c *codec) Decode(out interface{}, input []byte) error {
 
 	indirect := reflect.Indirect(v)
 
+	fakeField := codecStructField{}
+	fakeField.Type = typeOfElement
+
+	return c.readFieldData(fakeField, indirect)
 	//c.cacheReflectionData(typeOfElement, indirect.Type())
 
 	return c.readComplexFieldData(typeOfElement, indirect)

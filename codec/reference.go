@@ -224,7 +224,7 @@ func (c *codec) putReference(buffer *encode_buffer, t uint16, v reflect.Value) (
 			// use allocated data
 			c.mainBuffer.PushState(c.ref.buff.data[oldPos:], 0)
 			// put referenced object
-			_, err = c.encodeToBuffer(c.mainBuffer, interfaceActualData)
+			_, err = c.encodeElementToBuffer(c.mainBuffer, interfaceActualData)
 			// use buffer's data
 			c.mainBuffer.PopState()
 
@@ -250,11 +250,11 @@ func (c *codec) putReference(buffer *encode_buffer, t uint16, v reflect.Value) (
 				iter := v0.MapRange()
 
 				for iter.Next() {
-					_, err = c.encodeToBuffer(b, iter.Key())
+					_, err = c.encodeElementToBuffer(b, iter.Key())
 					if err != nil {
 						return err
 					}
-					_, err = c.encodeToBuffer(b, iter.Value())
+					_, err = c.encodeElementToBuffer(b, iter.Value())
 					if err != nil {
 						return err
 					}
