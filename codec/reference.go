@@ -30,7 +30,7 @@ func (this *references_reader) Get(id uint64) ([]byte, uint16, error) {
 
 	posStart := pos + 2
 
-	return this.buffer.data[posStart : posStart+int(length)], length, nil
+	return this.buffer.allocator.data[posStart : posStart+int(length)], length, nil
 }
 
 func (this *references_reader) Init(data []byte) {
@@ -58,7 +58,7 @@ func (this *references_reader) Init(data []byte) {
 }
 
 func (this *references_reader) Reset() {
-	this.buffer.pop_buff.Reset()
+	this.buffer.Reset()
 	this.refsCount = 0
 	this.dataLength = 0
 }
@@ -155,18 +155,15 @@ func (c *codec) writeArrayLikeData(v reflect.Value, parent_buf *encode_buffer, c
 
 	// ref size
 	c.ref.buff.PutUint16(uint16(allocate))
-	curPos := c.ref.buff.pos
 
 	// keeping allocated bytes for writing
-	c.ref.buff.Next(allocate)
+	branchedRefs := c.ref.buff.Branch(allocate)
 
-	parent_buf.PushState(c.ref.buff.data[curPos:], 0)
 	if sliceLength > 0 {
-		err = cb(sliceLength, v, c.mainBuffer)
+		err = cb(sliceLength, v, &branchedRefs)
 	} else {
 
 	}
-	parent_buf.PopState()
 
 	return
 }
@@ -216,18 +213,13 @@ func (c *codec) putReference(buffer *encode_buffer, t uint16, v reflect.Value) (
 			// allocated size in references for actual data
 			allocate, _ := c.getTypeSize(tCode)
 			c.ref.buff.PutUint16(uint16(allocate))
-			oldPos := c.ref.buff.pos
-
-			// skip allocated data
-			c.ref.buff.Next(allocate)
 
 			// use allocated data
-			c.mainBuffer.PushState(c.ref.buff.data[oldPos:], 0)
-			// put referenced object
-			_, err = c.encodeElementToBuffer(c.mainBuffer, interfaceActualData)
-			// use buffer's data
-			c.mainBuffer.PopState()
+			refArea := c.ref.buff.Branch(allocate)
 
+			// put referenced object
+			_, err = c.encodeElementToBuffer(&refArea, interfaceActualData)
+			// use buffer's data
 		case reflect.Map:
 
 			// [element type;2b][key type;2b][reference id; 2b] ... [name len;N;1b;][name bytes;Nb][fieldData;Xb]

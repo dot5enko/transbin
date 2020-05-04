@@ -76,13 +76,11 @@ func (c *codec) encodeInternal(obj interface{}, full bool) ([]byte, error) {
 	o := reflect.Indirect(reflect.ValueOf(obj))
 
 	// allocate 2 bytes for element type
-	c.mainBuffer.Next(2)
+	start := c.mainBuffer.Branch(2)
 
 	typeId, err := c.encodeElementToBuffer(c.mainBuffer, o)
 
-	c.mainBuffer.PushState(c.mainBuffer.data, 0)
-	c.mainBuffer.PutUint16(typeId)
-	c.mainBuffer.PopState()
+	start.PutUint16(typeId)
 
 	if err != nil {
 		return nil, err

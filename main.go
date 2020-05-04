@@ -57,7 +57,7 @@ func main() {
 	toEncode.MapVal.Int = 5
 	toEncode.MapVal.Name = "serhii"
 
-	ids := 3
+	ids := 15
 	toEncode.NestedStruct = make([]NStruct, ids)
 
 	for i := 0; i < ids; i++ {
@@ -91,17 +91,17 @@ func main() {
 
 	fmt.Printf("Got encoded data %d bytes length\n", len(encodedResult))
 
-	////decodedBack := make(map[string]interface{})
-	//decodedBack := TestStruct{}
-	////codec.Reporting = true
-	//err = c.Decode(&decodedBack, encodedResult)
-	//if err != nil {
-	//	panic(err)
-	//}
-	//
-	//jb, _ := json.Marshal(decodedBack)
-	//fmt.Printf("Got a result : %s\n", jb)
-	//return
+	//decodedBack := make(map[string]interface{})
+	decodedBack := TestStruct{}
+	//codec.Reporting = true
+	err = c.Decode(&decodedBack, encodedResult)
+	if err != nil {
+		panic(err)
+	}
+
+	jb, _ := json.Marshal(decodedBack)
+	fmt.Printf("Got a result : %s\n", jb)
+	return
 
 	//return
 	PrintBenchmark("binary full encode", testing.Benchmark(func(b *testing.B) {

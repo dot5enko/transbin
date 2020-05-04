@@ -1,9 +1,9 @@
 package codec
 
 type pop_buff struct {
-	data []byte
+	allocator *buff_allocator
+
 	pos  int
-	size int
 
 	states    []BufferState
 	statesPos int
@@ -15,33 +15,18 @@ type BufferState struct {
 	ref  []byte
 }
 
-func (this *pop_buff) InitStack() {
-	// todo resize
-	this.states = make([]BufferState, 10)
-	this.statesPos = 0
+type buff_allocator struct {
+	data []byte
+	size int
 }
 
-func (this *pop_buff) Reset() {
-	this.statesPos = 0
+func (this *encode_buffer) Branch(areaSize int) encode_buffer {
+	copy := this.BranchParalel()
+	this.pos += areaSize
+	return copy
 }
 
-func (this *pop_buff) PushState(data []byte, at int) {
-
-	this.states[this.statesPos] = BufferState{pos: this.pos, size: this.size, ref: this.data}
-
-	this.data = data
-	this.pos = at
-	this.size = len(data)
-
-	this.statesPos++
+func (this encode_buffer) BranchParalel() encode_buffer {
+	return this
 }
 
-func (this *pop_buff) PopState() {
-
-	this.statesPos--
-	prevState := this.states[this.statesPos]
-
-	this.data = prevState.ref
-	this.pos = prevState.pos
-	this.size = prevState.size
-}
