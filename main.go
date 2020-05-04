@@ -15,6 +15,7 @@ type NStruct struct {
 	N5      int
 	Floa    float64
 	Fl2     float64
+	Mapval  map[string]interface{}
 }
 
 type TestStruct struct {
@@ -58,6 +59,12 @@ func main() {
 		toEncode.NestedStruct[i].N5 = 55
 		toEncode.NestedStruct[i].Floa = 28973892.3833
 		toEncode.NestedStruct[i].Fl2 = 99.98765432
+		toEncode.NestedStruct[i].Mapval = make(map[string]interface{})
+
+
+		toEncode.NestedStruct[i].Mapval["price"] = 10.95;
+		toEncode.NestedStruct[i].Mapval["name"] = "json binary self describing proto";
+
 	}
 
 	jb0, _ := json.Marshal(toEncode)
@@ -73,17 +80,17 @@ func main() {
 
 	fmt.Printf("Got encoded data %d bytes length\n", len(encodedResult))
 
-	decodedBack := TestStruct{}
-
-	//codec.Reporting = true
-	err = c.Decode(&decodedBack, encodedResult)
-	if err != nil {
-		panic(err)
-	}
-
-	jb, _ := json.Marshal(decodedBack)
-	fmt.Printf("Got a result : %s\n", jb)
-	return
+	//decodedBack := TestStruct{}
+	//
+	////codec.Reporting = true
+	//err = c.Decode(&decodedBack, encodedResult)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//
+	//jb, _ := json.Marshal(decodedBack)
+	//fmt.Printf("Got a result : %s\n", jb)
+	//return
 
 	//return
 	PrintBenchmark("binary full encode", testing.Benchmark(func(b *testing.B) {

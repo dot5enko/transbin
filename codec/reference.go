@@ -57,6 +57,12 @@ func (this *references_reader) Init(data []byte) {
 	this.buffer.GotoPos(0)
 }
 
+func (this *references_reader) Reset() {
+	this.buffer.states.Init()
+	this.refsCount = 0
+	this.dataLength = 0
+}
+
 type references struct {
 	buff   *encode_buffer
 	Reader references_reader
@@ -119,6 +125,7 @@ func (this *references) Reset() {
 	this.buff.Reset()
 	this.count = 1
 	this.Reader.refsCount = 0
+	this.Reader.Reset();
 }
 
 func (c *codec) writeArrayLikeData(v reflect.Value, parent_buf *encode_buffer, cb func(n int, v reflect.Value, b *encode_buffer) error) (sliceLength int, err error) {
