@@ -18,6 +18,10 @@ type BufferState struct {
 	ref  []byte
 }
 
+func (this *pop_buff) InitStack() {
+	this.states = list.New()
+}
+
 func (this *pop_buff) PushState(data []byte, at int) {
 
 	this.states.PushBack(BufferState{pos: this.pos, size: this.size, ref: this.data})

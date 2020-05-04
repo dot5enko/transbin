@@ -8,6 +8,16 @@ import (
 	"time"
 )
 
+type ProductVal struct {
+	Name string
+	Price float64
+}
+
+type MapValStruct struct {
+	Int int
+	Name string
+}
+
 type NStruct struct {
 	Nint    int
 	Nstring int
@@ -15,14 +25,14 @@ type NStruct struct {
 	N5      int
 	Floa    float64
 	Fl2     float64
-	Mapval  map[string]interface{}
+	Product  ProductVal
 }
 
 type TestStruct struct {
 	Id           int
 	Value        float32
 	NestedStruct []NStruct
-	MapVal       map[string]interface{}
+	MapVal       MapValStruct
 	StrVal       string
 }
 
@@ -44,10 +54,8 @@ func main() {
 	toEncode.StrVal = "holaAmigo grande!"
 	//toEncode.Ids = []int32{99, 88, 77, 66, 55, 44, 33, 22, 11}
 
-	toEncode.MapVal = make(map[string]interface{})
-
-	toEncode.MapVal["int"] = 5
-	toEncode.MapVal["name"] = "serhii"
+	toEncode.MapVal.Int = 5
+	toEncode.MapVal.Name = "serhii"
 
 	ids := 3
 	toEncode.NestedStruct = make([]NStruct, ids)
@@ -59,11 +67,9 @@ func main() {
 		toEncode.NestedStruct[i].N5 = 55
 		toEncode.NestedStruct[i].Floa = 28973892.3833
 		toEncode.NestedStruct[i].Fl2 = 99.98765432
-		toEncode.NestedStruct[i].Mapval = make(map[string]interface{})
 
-
-		toEncode.NestedStruct[i].Mapval["price"] = 10.95;
-		toEncode.NestedStruct[i].Mapval["name"] = "json binary self describing proto";
+		toEncode.NestedStruct[i].Product.Price = 10.95;
+		toEncode.NestedStruct[i].Product.Name = "json binary self describing proto";
 
 	}
 

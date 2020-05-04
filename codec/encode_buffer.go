@@ -1,7 +1,6 @@
 package codec
 
 import (
-	"container/list"
 	"encoding/binary"
 	"math"
 )
@@ -19,7 +18,8 @@ func NewEncodeBuffer(size int, order binary.ByteOrder) *encode_buffer {
 	result.pos = 0
 	result.size = size
 	result.order = order
-	result.states = list.New()
+
+	result.InitStack();
 
 	return result
 }
