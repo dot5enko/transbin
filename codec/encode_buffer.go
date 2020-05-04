@@ -39,8 +39,6 @@ func (this *encode_buffer) ReadByte() (n byte, err error) {
 
 func (this *encode_buffer) grow(atLeast int) {
 
-	fmt.Printf("growing \n")
-
 	newSize := this.allocator.size*2
 	if (atLeast > newSize) {
 		newSize += atLeast
@@ -55,9 +53,9 @@ func (this *encode_buffer) grow(atLeast int) {
 
 func (this *encode_buffer) tryGrow(n int) {
 
-	curPos := this.pos
+	//curPos := this.pos
 
-	fmt.Printf("trying to grow. now %d at %d -> %d\n",this.allocator.size,curPos,this.pos + n)
+	//fmt.Printf("trying to grow. now %d at %d -> %d\n",this.allocator.size,curPos,this.pos + n)
 	if (this.pos + n) >= this.allocator.size {
 		this.grow(n)
 	}
