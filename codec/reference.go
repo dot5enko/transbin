@@ -30,7 +30,7 @@ func (this *references_reader) Get(id uint64) ([]byte, uint16, error) {
 
 	posStart := pos + 2
 
-	return this.buffer.data[posStart : posStart+int(length)], length, nil
+	return this.buffer.allocator.data[posStart : posStart+int(length)], length, nil
 }
 
 func (this *references_reader) Init(data []byte) {
@@ -58,7 +58,7 @@ func (this *references_reader) Init(data []byte) {
 }
 
 func (this *references_reader) Reset() {
-	this.buffer.pop_buff.Reset()
+	this.buffer.Reset()
 	this.refsCount = 0
 	this.dataLength = 0
 }
@@ -115,7 +115,7 @@ func (this *references) Put(data []byte) error {
 	actualLen, _ := this.buff.Write(data)
 
 	if actualLen != length {
-		return errors.New("Unable to write whole data")
+		return utils.Error("Unable to write whole data. expected % bytes. written %d",length,actualLen)
 	}
 
 	return nil
@@ -155,18 +155,13 @@ func (c *codec) writeArrayLikeData(v reflect.Value, parent_buf *encode_buffer, c
 
 	// ref size
 	c.ref.buff.PutUint16(uint16(allocate))
-	curPos := c.ref.buff.pos
 
 	// keeping allocated bytes for writing
-	c.ref.buff.Next(allocate)
+	arrayArea := parent_buf.Branch(allocate)
 
-	parent_buf.PushState(c.ref.buff.data[curPos:], 0)
 	if sliceLength > 0 {
-		err = cb(sliceLength, v, c.mainBuffer)
-	} else {
-
+		err = cb(sliceLength, v, arrayArea)
 	}
-	parent_buf.PopState()
 
 	return
 }
@@ -198,6 +193,7 @@ func (c *codec) putReference(buffer *encode_buffer, t uint16, v reflect.Value) (
 
 		switch v.Kind() {
 		case reflect.String:
+			fmt.Printf("current ref pos : %d out of %d\n",c.ref.buff.pos,c.ref.buff.size)
 			err = c.ref.Put([]byte(v.String()))
 		case reflect.Interface:
 			// [type of ref data;2b;][ref id; 2b]
@@ -216,17 +212,13 @@ func (c *codec) putReference(buffer *encode_buffer, t uint16, v reflect.Value) (
 			// allocated size in references for actual data
 			allocate, _ := c.getTypeSize(tCode)
 			c.ref.buff.PutUint16(uint16(allocate))
-			oldPos := c.ref.buff.pos
 
-			// skip allocated data
-			c.ref.buff.Next(allocate)
+			// allocate data in ref
+			interfaceDataBuffer := c.ref.buff.Branch(allocate)
 
-			// use allocated data
-			c.mainBuffer.PushState(c.ref.buff.data[oldPos:], 0)
 			// put referenced object
-			_, err = c.encodeElementToBuffer(c.mainBuffer, interfaceActualData)
+			_, err = c.encodeElementToBuffer(interfaceDataBuffer, interfaceActualData)
 			// use buffer's data
-			c.mainBuffer.PopState()
 
 		case reflect.Map:
 

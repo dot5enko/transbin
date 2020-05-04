@@ -219,7 +219,8 @@ func (c *codec) readMapField(interfaceElemType uint16, keyType uint16, refBytes 
 
 	dataLen := len(refBytes)
 
-	c.decodeBuffer.PushState(refBytes, 0)
+	buffer := NewDecodeBuffer(c.order)
+	buffer.Init(refBytes)
 
 	newMap := reflect.MakeMap(out.Type())
 
