@@ -58,7 +58,7 @@ func (this *references_reader) Init(data []byte) {
 }
 
 func (this *references_reader) Reset() {
-	this.buffer.states.Init()
+	this.buffer.pop_buff.Reset();
 	this.refsCount = 0
 	this.dataLength = 0
 }
