@@ -11,7 +11,7 @@ func (c *codec) EncodeFull(obj interface{}) ([]byte, error) {
 func (c *codec) Encode(obj interface{}) ([]byte, error) {
 	return c.encodeInternal(obj, false)
 }
-func (c *codec) encodeElementToBuffer(buffer *encode_buffer, o reflect.Value) (uint16, error) {
+func (c *codec) encodeElementToBuffer(buffer encode_buffer, o reflect.Value) (uint16, error) {
 
 	var writtenType uint16 = 0
 
@@ -103,7 +103,7 @@ func (c *codec) encodeInternal(obj interface{}, full bool) ([]byte, error) {
 	return c.encodeBuffer.Bytes(), nil
 }
 
-func (c *codec) writeSimpleFieldData(buffer *encode_buffer, v reflect.Value) error {
+func (c *codec) writeSimpleFieldData(buffer encode_buffer, v reflect.Value) error {
 
 	switch v.Kind() {
 	case reflect.Int32:
@@ -121,7 +121,7 @@ func (c *codec) writeSimpleFieldData(buffer *encode_buffer, v reflect.Value) err
 	return nil
 }
 
-func (c *codec) writeComplexType(buffer *encode_buffer, t uint16, v reflect.Value) (err error) {
+func (c *codec) writeComplexType(buffer encode_buffer, t uint16, v reflect.Value) (err error) {
 
 	c.useType(t)
 
@@ -138,7 +138,7 @@ func (c *codec) writeComplexType(buffer *encode_buffer, t uint16, v reflect.Valu
 
 }
 
-func (c *codec) writeFieldData(buffer *encode_buffer, field codecStructField, v reflect.Value) (err error) {
+func (c *codec) writeFieldData(buffer encode_buffer, field codecStructField, v reflect.Value) (err error) {
 
 	if isArrayType(field.Type) {
 		err = c.writeReferenceFieldData(buffer, field.Type, v)
@@ -168,7 +168,7 @@ func (c *codec) writeFieldData(buffer *encode_buffer, field codecStructField, v 
 
 }
 
-func (c *codec) writeReferenceFieldData(buffer *encode_buffer, t uint16, v reflect.Value) error {
+func (c *codec) writeReferenceFieldData(buffer encode_buffer, t uint16, v reflect.Value) error {
 
 	id, err := c.putReference(buffer, t, v)
 	if err != nil {

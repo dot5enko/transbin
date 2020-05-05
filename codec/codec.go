@@ -19,12 +19,12 @@ type codec struct {
 	typeMap    map[string]uint16
 
 	// state
-	mainBuffer *encode_buffer
+	mainBuffer encode_buffer
 	ref        *references
 	usedTypes  *DynamicArray
 
 	encodeBuffer    *bytes.Buffer
-	structureBuffer *encode_buffer
+	structureBuffer encode_buffer
 
 	decodeBuffer *decode_buffer
 

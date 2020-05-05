@@ -64,7 +64,7 @@ func (this *references_reader) Reset() {
 }
 
 type references struct {
-	buff   *encode_buffer
+	buff   encode_buffer
 	Reader references_reader
 
 	count uint64
@@ -128,7 +128,7 @@ func (this *references) Reset() {
 	this.Reader.Reset()
 }
 
-func (c *codec) writeArrayLikeData(v reflect.Value, parent_buf *encode_buffer, cb func(n int, v reflect.Value, b *encode_buffer) error) (sliceLength int, err error) {
+func (c *codec) writeArrayLikeData(v reflect.Value, parent_buf encode_buffer, cb func(n int, v reflect.Value, b encode_buffer) error) (sliceLength int, err error) {
 	sliceLength = v.Len()
 
 	var t uint16
@@ -157,10 +157,8 @@ func (c *codec) writeArrayLikeData(v reflect.Value, parent_buf *encode_buffer, c
 	c.ref.buff.PutUint16(uint16(allocate))
 
 	// keeping allocated bytes for writing
-	branchedRefs := c.ref.buff.Branch(allocate)
-
 	if sliceLength > 0 {
-		err = cb(sliceLength, v, &branchedRefs)
+		err = cb(sliceLength, v, c.ref.buff.Branch(allocate))
 	} else {
 
 	}
@@ -168,14 +166,14 @@ func (c *codec) writeArrayLikeData(v reflect.Value, parent_buf *encode_buffer, c
 	return
 }
 
-func (c *codec) putReference(buffer *encode_buffer, t uint16, v reflect.Value) (reference uint16, err error) {
+func (c *codec) putReference(buffer encode_buffer, t uint16, v reflect.Value) (reference uint16, err error) {
 
 	reference = uint16(c.ref.GetId())
 
 	if isArrayType(t) {
 		at := getArrayElementType(t)
 		c.useType(at)
-		_, err = c.writeArrayLikeData(v, buffer, func(n int, v0 reflect.Value, b *encode_buffer) error {
+		_, err = c.writeArrayLikeData(v, buffer, func(n int, v0 reflect.Value, b encode_buffer) error {
 			var fakeField codecStructField
 			fakeField.Type = at
 
@@ -215,10 +213,8 @@ func (c *codec) putReference(buffer *encode_buffer, t uint16, v reflect.Value) (
 			c.ref.buff.PutUint16(uint16(allocate))
 
 			// use allocated data
-			refArea := c.ref.buff.Branch(allocate)
-
 			// put referenced object
-			_, err = c.encodeElementToBuffer(&refArea, interfaceActualData)
+			_, err = c.encodeElementToBuffer(c.ref.buff.Branch(allocate), interfaceActualData)
 			// use buffer's data
 		case reflect.Map:
 
@@ -237,7 +233,7 @@ func (c *codec) putReference(buffer *encode_buffer, t uint16, v reflect.Value) (
 			// type of key
 			buffer.PutUint16(typeOfMapKey)
 
-			_, err = c.writeArrayLikeData(v, buffer, func(n int, v0 reflect.Value, b *encode_buffer) error {
+			_, err = c.writeArrayLikeData(v, buffer, func(n int, v0 reflect.Value, b encode_buffer) error {
 
 				iter := v0.MapRange()
 
