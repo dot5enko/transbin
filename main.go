@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+import _ "net/http/pprof"
+
 type ProductVal struct {
 	Name  string
 	Price float64
@@ -47,6 +49,10 @@ func PrintBenchmark(label string, result testing.BenchmarkResult) {
 }
 
 func main() {
+
+	//go func() {
+	//	log.Println(http.ListenAndServe("localhost:6060", nil))
+	//}()
 
 	var toEncode TestStruct
 
@@ -92,23 +98,25 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Printf("Got encoded data %d bytes length\n", len(encodedResult))
+	//fmt.Printf("Got encoded data %d bytes length\n", len(encodedResult))
 
 	//decodedBack := make(map[string]interface{})
-	//decodedBack := TestStruct{}
-	//decodeCtx := codec.NewDecodeContext(c)
-	//
-	////codec.Reporting = true
-	//err = decodeCtx.Decode(&decodedBack, encodedResult)
-	//if err != nil {
-	//	panic(err)
-	//}
-	//
-	//jb, _ := json.Marshal(decodedBack)
-	//fmt.Printf("Got a result : %s\n", jb)
+	decodedBack := TestStruct{}
+	decodeCtx := codec.NewDecodeContext(c)
+
+	//codec.Reporting = true
+	err = decodeCtx.Decode(&decodedBack, encodedResult)
+	if err != nil {
+		panic(err)
+	}
+
+	jb, _ := json.Marshal(decodedBack)
+	fmt.Printf("Got a result : %s\n", jb)
+
+	time.Sleep(time.Microsecond)
 	//return
 
-	//return
+	////return
 	PrintBenchmark("binary full encode", testing.Benchmark(func(b *testing.B) {
 
 		for i := 0; i < b.N; i++ {

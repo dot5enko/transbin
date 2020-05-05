@@ -7,6 +7,8 @@ import (
 	"github.com/dot5enko/transbin/utils"
 	"math"
 	"reflect"
+	"runtime"
+	"unsafe"
 )
 
 type references_writer struct {
@@ -105,6 +107,9 @@ func (c *encode_context) writeArrayLikeData(v reflect.Value, parent_buf encode_b
 	return
 }
 
+var curms runtime.MemStats
+var refsC uint64 = 0
+
 func (c *encode_context) putReference(buffer encode_buffer, t uint16, v reflect.Value) (reference uint16, err error) {
 
 	reference = uint16(c.ref.GetId())
@@ -132,7 +137,17 @@ func (c *encode_context) putReference(buffer encode_buffer, t uint16, v reflect.
 
 		switch v.Kind() {
 		case reflect.String:
-			err = c.ref.Put([]byte(v.String()))
+
+			var vStr []byte
+
+			if v.CanAddr() {
+				vStr = *(*[]byte)(unsafe.Pointer(v.UnsafeAddr()))
+			} else {
+				vStr = []byte(v.String())
+			}
+
+			err = c.ref.Put([]byte(vStr))
+
 		case reflect.Interface:
 			// [type of ref data;2b;][ref id; 2b]
 

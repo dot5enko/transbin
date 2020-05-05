@@ -161,7 +161,7 @@ func (c *encode_context) writeStructureData(buffer encode_buffer) {
 	// number of types in list
 	buffer.WriteByte(uint8(numberOfTypes))
 
-	if (numberOfTypes > 0) {
+	if numberOfTypes > 0 {
 		//
 		c.usedTypes.Sort()
 

@@ -75,12 +75,7 @@ func (this encode_buffer) grow(atLeast int) {
 	this.data = newBuf
 	this.size = newSize
 }
-
 func (this encode_buffer) tryGrow(n int) {
-
-	//curPos := this.pos
-
-	//fmt.Printf("trying to grow. now %d at %d -> %d\n",this.size,curPos,this.pos + n)
 	if (this.pos + n) >= this.size {
 		this.grow(n)
 	}
