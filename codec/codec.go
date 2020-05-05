@@ -184,9 +184,9 @@ func (c *codec) getTypeSize(t uint16) (int, error) {
 	}
 }
 
-func (c *codec) readArrayElement(elementType uint16, out reflect.Value) error {
+func (c *codec) readArrayElement(buffer *decode_buffer, elementType uint16, out reflect.Value) error {
 
-	c.decodeBuffer.ReadUint16(&c.dataBuffer.uint16val)
+	buffer.ReadUint16(&c.dataBuffer.uint16val)
 	arrayData, length, err := c.ref.Reader.Get(uint64(c.dataBuffer.uint16val))
 	if err != nil {
 		return err
@@ -199,27 +199,24 @@ func (c *codec) readArrayElement(elementType uint16, out reflect.Value) error {
 
 	var items int = int(length) / typeSize
 
+	// check if out is not a slice already
 	arrayResult := reflect.MakeSlice(out.Type(), items, items)
-	c.decodeBuffer.PushState(arrayData, 0)
 
 	fakeField := codecStructField{}
 	fakeField.Type = elementType
 
 	for i := 0; i < items; i++ {
-		c.readFieldData(fakeField, arrayResult.Index(i))
+		c.readFieldData(buffer.InitBranch(arrayData), fakeField, arrayResult.Index(i))
 	}
-	c.decodeBuffer.PopState()
 
 	out.Set(arrayResult)
 
 	return nil
 }
 
-func (c *codec) readMapField(interfaceElemType uint16, keyType uint16, refBytes []byte, out reflect.Value) error {
+func (c *codec) readMapField(buffer *decode_buffer, interfaceElemType uint16, keyType uint16, refBytes []byte, out reflect.Value) error {
 
 	dataLen := len(refBytes)
-
-	c.decodeBuffer.PushState(refBytes, 0)
 
 	newMap := reflect.MakeMap(out.Type())
 
@@ -240,10 +237,12 @@ func (c *codec) readMapField(interfaceElemType uint16, keyType uint16, refBytes 
 	fakeKeyField := codecStructField{}
 	fakeKeyField.Type = keyType
 
+	subBuffer := buffer.InitBranch(refBytes)
+
 	for i := 0; i < elems; i++ {
 		// read key
 		fakeKeyField.Type = keyType
-		err := c.readFieldData(fakeKeyField, keys.Index(i))
+		err := c.readFieldData(subBuffer, fakeKeyField, keys.Index(i))
 
 		if err != nil {
 			return err
@@ -251,7 +250,7 @@ func (c *codec) readMapField(interfaceElemType uint16, keyType uint16, refBytes 
 
 		// read value
 		fakeKeyField.Type = interfaceElemType
-		err = c.readFieldData(fakeKeyField, values.Index(i))
+		err = c.readFieldData(subBuffer, fakeKeyField, values.Index(i))
 		if err != nil {
 			return err
 		}
@@ -260,7 +259,6 @@ func (c *codec) readMapField(interfaceElemType uint16, keyType uint16, refBytes 
 	}
 
 	out.Set(newMap)
-	c.decodeBuffer.PopState()
 
 	return err
 }

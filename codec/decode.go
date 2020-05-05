@@ -140,25 +140,25 @@ func (c *codec) Decode(out interface{}, input []byte) error {
 	fakeField := codecStructField{}
 	fakeField.Type = typeOfElement
 
-	return c.readFieldData(fakeField, indirect)
+	return c.readFieldData(c.decodeBuffer, fakeField, indirect)
 	//c.cacheReflectionData(typeOfElement, indirect.Type())
 
-	return c.readComplexFieldData(typeOfElement, indirect)
+	//return c.readComplexFieldData(typeOfElement, indirect)
 }
 
-func (c *codec) readFieldData(field codecStructField, out reflect.Value) error {
+func (c *codec) readFieldData(buffer *decode_buffer, field codecStructField, out reflect.Value) error {
 
 	if isArrayType(field.Type) {
-		return c.readArrayElement(getArrayElementType(field.Type), out)
+		return c.readArrayElement(buffer, getArrayElementType(field.Type), out)
 	} else {
 		if field.Type > internalTypesCount {
-			return c.readComplexFieldData(field.Type, out)
+			return c.readComplexFieldData(buffer,field.Type, out)
 		} else {
 			switch reflect.Kind(field.Type) {
 			case reflect.String, reflect.Map, reflect.Interface:
-				return c.readReferenceFieldData(field.Type, out)
+				return c.readReferenceFieldData(buffer, field.Type, out)
 			default:
-				return c.readSimpleFieldData(field.Type, out)
+				return c.readSimpleFieldData(buffer, field.Type, out)
 			}
 
 		}
@@ -167,13 +167,13 @@ func (c *codec) readFieldData(field codecStructField, out reflect.Value) error {
 func setInterface(acceptor reflect.Value, value interface{}) {
 	acceptor.Set(reflect.ValueOf(value))
 }
-func (c *codec) readSimpleFieldData(t uint16, out reflect.Value) error {
+func (c *codec) readSimpleFieldData(buffer *decode_buffer,t uint16, out reflect.Value) error {
 
 	tmpVal := reflect.Indirect(out)
 
 	switch reflect.Kind(t) {
 	case reflect.Int, reflect.Int32:
-		err := c.decodeBuffer.ReadInt32(&c.dataBuffer.int32val)
+		err := buffer.ReadInt32(&c.dataBuffer.int32val)
 
 		if err != nil {
 			return err
@@ -192,7 +192,7 @@ func (c *codec) readSimpleFieldData(t uint16, out reflect.Value) error {
 			return utils.Error("Cant set value on field of type %d\n", t)
 		}
 	case reflect.Float64:
-		c.decodeBuffer.ReadFloat64(&c.dataBuffer.float64val)
+		buffer.ReadFloat64(&c.dataBuffer.float64val)
 		if tmpVal.CanSet() {
 
 			val := float64(c.dataBuffer.float64val)
@@ -207,7 +207,7 @@ func (c *codec) readSimpleFieldData(t uint16, out reflect.Value) error {
 		}
 	case reflect.Float32:
 
-		c.decodeBuffer.ReadFloat32(&c.dataBuffer.float32val)
+		buffer.ReadFloat32(&c.dataBuffer.float32val)
 		if tmpVal.CanSet() {
 
 			if tmpVal.Kind() == reflect.Interface {
@@ -226,11 +226,11 @@ func (c *codec) readSimpleFieldData(t uint16, out reflect.Value) error {
 
 }
 
-func (c *codec) readReferenceFieldData(t uint16, out reflect.Value) error {
+func (c *codec) readReferenceFieldData(buffer *decode_buffer, t uint16, out reflect.Value) error {
 
 	switch reflect.Kind(t) {
 	case reflect.String:
-		c.decodeBuffer.ReadUint16(&c.dataBuffer.uint16val)
+		buffer.ReadUint16(&c.dataBuffer.uint16val)
 
 		refBytes, _, err := c.ref.Reader.Get(uint64(c.dataBuffer.uint16val))
 		if err != nil {
@@ -247,24 +247,24 @@ func (c *codec) readReferenceFieldData(t uint16, out reflect.Value) error {
 		var elType uint16
 		var keyType uint16
 
-		c.decodeBuffer.ReadUint16(&elType)
-		c.decodeBuffer.ReadUint16(&keyType)
+		buffer.ReadUint16(&elType)
+		buffer.ReadUint16(&keyType)
 
-		c.decodeBuffer.ReadUint16(&c.dataBuffer.uint16val)
+		buffer.ReadUint16(&c.dataBuffer.uint16val)
 
 		refBytes, _, err := c.ref.Reader.Get(uint64(c.dataBuffer.uint16val))
 		if err != nil {
 			return err
 		}
-		err = c.readMapField(elType, keyType, refBytes, out)
+		err = c.readMapField(buffer, elType, keyType, refBytes, out)
 		if err != nil {
 			return err
 		}
 	case reflect.Interface:
 
 		var interfaceType uint16
-		c.decodeBuffer.ReadUint16(&interfaceType)
-		c.decodeBuffer.ReadUint16(&c.dataBuffer.uint16val)
+		buffer.ReadUint16(&interfaceType)
+		buffer.ReadUint16(&c.dataBuffer.uint16val)
 
 		refBytes, _, err := c.ref.Reader.Get(uint64(c.dataBuffer.uint16val))
 		if err != nil {
@@ -273,9 +273,7 @@ func (c *codec) readReferenceFieldData(t uint16, out reflect.Value) error {
 		fakeField := codecStructField{}
 		fakeField.Type = interfaceType
 
-		c.decodeBuffer.PushState(refBytes, 0)
-		c.readFieldData(fakeField, out)
-		c.decodeBuffer.PopState()
+		c.readFieldData(buffer.InitBranch(refBytes), fakeField, out)
 	default:
 		return utils.Error("Unable to decode referenced type: %s\n", reflect.Kind(t).String())
 	}
@@ -283,7 +281,7 @@ func (c *codec) readReferenceFieldData(t uint16, out reflect.Value) error {
 	return nil
 }
 
-func (c *codec) readComplexFieldData(t uint16, out reflect.Value) (err error) {
+func (c *codec) readComplexFieldData(buffer *decode_buffer,t uint16, out reflect.Value) (err error) {
 
 	refValue := reflect.Indirect(out)
 
@@ -307,7 +305,7 @@ func (c *codec) readComplexFieldData(t uint16, out reflect.Value) (err error) {
 			}
 		}
 
-		err = c.readFieldData(f, fieldObj)
+		err = c.readFieldData(buffer,f, fieldObj)
 
 		if err != nil {
 			return

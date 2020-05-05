@@ -6,52 +6,40 @@ import (
 )
 
 type decode_buffer struct {
-	pop_buff
+	allocator buff_allocator
+
+	pos int
+
+	states    []BufferState
+	statesPos int
+
 	order binary.ByteOrder
+}
+
+type BufferState struct {
+	pos  int
+	size int
+	ref  []byte
 }
 
 func NewDecodeBuffer(order binary.ByteOrder) *decode_buffer {
 
 	result := &decode_buffer{order: order}
-	result.InitStack()
+	result.allocator = buff_allocator{}
 
 	return result
 }
 
-func (this *decode_buffer) InitStack() {
-	// todo resize
-	this.states = make([]BufferState, 10)
-	this.statesPos = 0
-}
-
 func (this *decode_buffer) Reset() {
-	this.statesPos = 0
 }
 
-func (this *decode_buffer) PushState(data []byte, at int) {
+func (this decode_buffer) InitBranch(data []byte) *decode_buffer {
 
-	this.states[this.statesPos] = BufferState{pos: this.pos, size: this.allocator.size, ref: this.allocator.data}
-
-	this.allocator.data = data
-	this.pos = at
-	this.allocator.size = len(data)
-
-	this.statesPos++
+	this.Init(data)
+	return &this
 }
-
-func (this *decode_buffer) PopState() {
-
-	this.statesPos--
-	prevState := this.states[this.statesPos]
-
-	this.allocator.data = prevState.ref
-	this.pos = prevState.pos
-	this.allocator.size = prevState.size
-}
-
 
 func (this *decode_buffer) Init(b []byte) {
-	this.allocator = &buff_allocator{}
 	this.allocator.data = b
 	this.pos = 0
 }

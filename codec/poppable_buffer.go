@@ -3,16 +3,7 @@ package codec
 type pop_buff struct {
 	allocator *buff_allocator
 
-	pos  int
-
-	states    []BufferState
-	statesPos int
-}
-
-type BufferState struct {
-	pos  int
-	size int
-	ref  []byte
+	pos int
 }
 
 type buff_allocator struct {
@@ -29,4 +20,3 @@ func (this *encode_buffer) Branch(areaSize int) encode_buffer {
 func (this encode_buffer) BranchParalel() encode_buffer {
 	return this
 }
-
