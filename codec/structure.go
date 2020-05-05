@@ -45,25 +45,25 @@ func getArrayElementType(typeId uint16) uint16 {
 	return typeId
 }
 
-func (c *codec) registerStructure(ot reflect.Type) (*structDefinition, error) {
+func (c *encode_context) registerStructure(ot reflect.Type) (*structDefinition, error) {
 
 	if ot.Kind() == reflect.Ptr {
 		ot = ot.Elem()
 	}
 
 	name := getTypeCode(ot)
-	value, ok := c.typeMap[name]
+	value, ok := c.global.typeMap[name]
 	if ok {
-		return c.types[value], nil
+		return c.global.types[value], nil
 	} else {
 
 		fieldsCount := ot.NumField()
 
-		c.typesCount += 1
+		c.global.typesCount += 1
 
 		structDef := structDefinition{
 			Fields:     make([]codecStructField, fieldsCount),
-			Id:         c.typesCount,
+			Id:         c.global.typesCount,
 			FieldCount: uint8(fieldsCount),
 			Name:       name,
 		}
@@ -113,7 +113,7 @@ func (c *codec) registerStructure(ot reflect.Type) (*structDefinition, error) {
 				switch sliceElem.Kind() {
 				case reflect.Struct:
 					ok = false
-					typeWithArrayFlag, ok = c.typeMap[getTypeCode(sliceElem)]
+					typeWithArrayFlag, ok = c.global.typeMap[getTypeCode(sliceElem)]
 					if !ok {
 						nested, err := c.registerStructure(sliceElem)
 						if err != nil {
@@ -133,7 +133,7 @@ func (c *codec) registerStructure(ot reflect.Type) (*structDefinition, error) {
 				sf.Size = 2 // reference
 			default:
 				sf.Type = uint16(ft.Kind())
-				sf.Size, err = c.getTypeSize(sf.Type)
+				sf.Size, err = c.global.getTypeSize(sf.Type)
 				if err != nil {
 					return nil, err
 				}
@@ -142,14 +142,15 @@ func (c *codec) registerStructure(ot reflect.Type) (*structDefinition, error) {
 			structDef.Size += sf.Size
 		}
 
-		c.types[structDef.Id] = &structDef
-		c.typeMap[name] = structDef.Id
+		c.global.types[structDef.Id] = &structDef
+		c.global.typeMap[name] = structDef.Id
 
-		return c.types[structDef.Id], nil
+		return c.global.types[structDef.Id], nil
 	}
 }
 
-func (c *codec) getStructureData() []byte {
+// todo no need to use separate buffer for structure
+func (c *encode_context) writeStructureData(buffer encode_buffer) {
 
 	numberOfTypes := c.usedTypes.Length()
 
@@ -158,32 +159,31 @@ func (c *codec) getStructureData() []byte {
 	}
 
 	// number of types in list
-	c.structureBuffer.WriteByte(uint8(numberOfTypes))
+	buffer.WriteByte(uint8(numberOfTypes))
 
-	//
-	c.usedTypes.Sort()
+	if (numberOfTypes > 0) {
+		//
+		c.usedTypes.Sort()
 
-	for i := c.usedTypes.Length() - 1; i >= 0; i-- {
+		for i := c.usedTypes.Length() - 1; i >= 0; i-- {
 
-		v := c.usedTypes.data[i]
-		t := c.types[uint16(v)]
+			v := c.usedTypes.data[i]
+			t := c.global.types[uint16(v)]
 
-		// type id uint16
-		c.structureBuffer.PutUint16(t.Id)
+			// type id uint16
+			buffer.PutUint16(t.Id)
 
-		// number of fields uint8
-		c.structureBuffer.WriteByte(t.FieldCount)
+			// number of fields uint8
+			buffer.WriteByte(t.FieldCount)
 
-		for _, f := range t.Fields {
-			// field type
-			c.structureBuffer.PutUint16(f.Type)
+			for _, f := range t.Fields {
+				// field type
+				buffer.PutUint16(f.Type)
 
-			// field name
-			c.structureBuffer.WriteByte(f.NameLength)
-			c.structureBuffer.Write([]byte(f.Name))
+				// field name
+				buffer.WriteByte(f.NameLength)
+				buffer.Write([]byte(f.Name))
+			}
 		}
 	}
-
-	header := c.structureBuffer.Bytes()
-	return header
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"github.com/dot5enko/transbin/codec"
@@ -82,19 +83,23 @@ func main() {
 	fmt.Printf("Bef a result : %s[%d]\n", jb0, len(jb0))
 
 	var encodedFull []byte
-	c, _ := codec.NewCodec()
+	c, _ := codec.NewCodec(binary.LittleEndian)
 
-	encodedResult, err := c.EncodeFull(toEncode)
+	ctx := codec.NewEncodeContext(c)
+
+	encodedResult, err := ctx.EncodeFull(toEncode)
 	if err != nil {
 		panic(err)
 	}
 
 	fmt.Printf("Got encoded data %d bytes length\n", len(encodedResult))
 
-	////decodedBack := make(map[string]interface{})
+	//decodedBack := make(map[string]interface{})
 	//decodedBack := TestStruct{}
+	//decodeCtx := codec.NewDecodeContext(c)
+	//
 	////codec.Reporting = true
-	//err = c.Decode(&decodedBack, encodedResult)
+	//err = decodeCtx.Decode(&decodedBack, encodedResult)
 	//if err != nil {
 	//	panic(err)
 	//}
@@ -107,19 +112,20 @@ func main() {
 	PrintBenchmark("binary full encode", testing.Benchmark(func(b *testing.B) {
 
 		for i := 0; i < b.N; i++ {
-			encodedFull, _ = c.EncodeFull(toEncode)
+			encodedFull, _ = ctx.EncodeFull(toEncode)
 		}
 
 		b.ReportAllocs()
 		b.ReportMetric(float64(len(encodedFull)), "encoded_size")
 	}))
 
-	binpro, _ := codec.NewCodec()
+	binpro, _ := codec.NewCodec(binary.LittleEndian)
+	binproDec := codec.NewDecodeContext(binpro)
 	PrintBenchmark("binary full decode", testing.Benchmark(func(b *testing.B) {
 
 		var x TestStruct
 		for i := 0; i < b.N; i++ {
-			err := binpro.Decode(&x, encodedFull)
+			err := binproDec.Decode(&x, encodedFull)
 			if err != nil {
 				panic(err)
 			}
@@ -132,29 +138,31 @@ func main() {
 	fmt.Println("")
 
 	var encoded []byte
-	bin, _ := codec.NewCodec()
+	bin, _ := codec.NewCodec(binary.LittleEndian)
+	binCtx := codec.NewEncodeContext(bin)
 
 	PrintBenchmark("binary data encode", testing.Benchmark(func(b *testing.B) {
 
 		for i := 0; i < b.N; i++ {
-			encoded, _ = bin.Encode(toEncode)
+			encoded, _ = binCtx.Encode(toEncode)
 		}
 
 		b.ReportAllocs()
 		b.ReportMetric(float64(len(encoded)), "encoded_size")
 	}))
 
-	binpro1, _ := codec.NewCodec()
+	binpro1, _ := codec.NewCodec(binary.LittleEndian)
+	binpro1Ctx := codec.NewDecodeContext(binpro1)
 
 	PrintBenchmark("binary data decode", testing.Benchmark(func(b *testing.B) {
 
 		var x TestStruct
 
 		// read structure
-		binpro1.Decode(&x, encodedFull)
+		binpro1Ctx.Decode(&x, encodedFull)
 
 		for i := 0; i < b.N; i++ {
-			err := binpro1.Decode(&x, encoded)
+			err := binpro1Ctx.Decode(&x, encoded)
 			if err != nil {
 				panic(err)
 			}

@@ -9,71 +9,16 @@ import (
 	"reflect"
 )
 
-type references_reader struct {
-	buffer     *decode_buffer
-	offsets    map[uint64]uint64
-	dataLength uint16
-	refsCount  uint64
-}
-
-func (this *references_reader) Get(id uint64) ([]byte, uint16, error) {
-
-	if this.refsCount == 0 || id > this.refsCount {
-		return nil, 0, utils.Error("No such reference. refCount = %d", this.refsCount)
-	}
-
-	pos := int(this.offsets[id])
-	var length uint16
-
-	this.buffer.GotoPos(pos)
-	this.buffer.ReadUint16(&length)
-
-	posStart := pos + 2
-
-	return this.buffer.allocator.data[posStart : posStart+int(length)], length, nil
-}
-
-func (this *references_reader) Init(data []byte) {
-
-	dLen := len(data)
-
-	this.buffer.Init(data)
-	this.buffer.GotoPos(0)
-
-	for {
-
-		this.refsCount++
-
-		this.offsets[this.refsCount] = uint64(this.buffer.pos)
-		this.buffer.ReadUint16(&this.dataLength)
-
-		this.buffer.Next(int(this.dataLength))
-
-		if this.buffer.pos >= dLen {
-			break
-		}
-	}
-
-	this.buffer.GotoPos(0)
-}
-
-func (this *references_reader) Reset() {
-	this.buffer.Reset()
-	this.refsCount = 0
-	this.dataLength = 0
-}
-
-type references struct {
-	buff   encode_buffer
-	Reader references_reader
+type references_writer struct {
+	buff encode_buffer
 
 	count uint64
 	cap   uint64
 	order binary.ByteOrder
 }
 
-func NewReferencesHandler(addressWidth int, order binary.ByteOrder) (*references, error) {
-	result := &references{}
+func NewReferencesWriter(addressWidth int, order binary.ByteOrder) (*references_writer, error) {
+	result := &references_writer{}
 
 	if addressWidth%8 != 0 {
 		return nil, utils.Error("Adress width should be a multiply of 8")
@@ -83,26 +28,22 @@ func NewReferencesHandler(addressWidth int, order binary.ByteOrder) (*references
 	result.buff = NewEncodeBuffer(512, order)
 	result.cap = uint64(math.Pow(2, float64(addressWidth)) - 1)
 
-	// reader init
-	result.Reader.buffer = NewDecodeBuffer(order)
-	result.Reader.offsets = make(map[uint64]uint64)
-
 	result.Reset()
 
 	return result, nil
 }
 
-func (this *references) GetId() uint64 {
+func (this *references_writer) GetId() uint64 {
 
 	cur := this.count
 
 	this.count++
 	return cur
 }
-func (this *references) Put(data []byte) error {
+func (this *references_writer) Put(data []byte) error {
 
 	if this.count == this.cap {
-		return errors.New("You reached limit of references. addressation overflow")
+		return errors.New("You reached limit of references_writer. addressation overflow")
 	}
 
 	length := len(data)
@@ -121,32 +62,30 @@ func (this *references) Put(data []byte) error {
 	return nil
 }
 
-func (this *references) Reset() {
+func (this *references_writer) Reset() {
 	this.buff.Reset()
 	this.count = 1
-	this.Reader.refsCount = 0
-	this.Reader.Reset()
 }
 
-func (c *codec) writeArrayLikeData(v reflect.Value, parent_buf encode_buffer, cb func(n int, v reflect.Value, b encode_buffer) error) (sliceLength int, err error) {
+func (c *encode_context) writeArrayLikeData(v reflect.Value, parent_buf encode_buffer, cb func(n int, v reflect.Value, b encode_buffer) error) (sliceLength int, err error) {
 	sliceLength = v.Len()
 
 	var t uint16
-	t, err = c.getType(v.Type().Elem())
+	t, err = c.global.getType(v.Type().Elem())
 	if err != nil {
 		return
 	}
 
 	var sizeOfElement int
 
-	sizeOfElement, _ = c.getTypeSize(t)
+	sizeOfElement, _ = c.global.getTypeSize(t)
 
 	if v.Kind() == reflect.Map {
-		keyType, err := c.getType(v.Type().Key())
+		keyType, err := c.global.getType(v.Type().Key())
 		if err != nil {
 			return 0, err
 		}
-		sizeOfKey, _ := c.getTypeSize(keyType)
+		sizeOfKey, _ := c.global.getTypeSize(keyType)
 		sizeOfElement += sizeOfKey
 
 	}
@@ -166,7 +105,7 @@ func (c *codec) writeArrayLikeData(v reflect.Value, parent_buf encode_buffer, cb
 	return
 }
 
-func (c *codec) putReference(buffer encode_buffer, t uint16, v reflect.Value) (reference uint16, err error) {
+func (c *encode_context) putReference(buffer encode_buffer, t uint16, v reflect.Value) (reference uint16, err error) {
 
 	reference = uint16(c.ref.GetId())
 
@@ -200,7 +139,7 @@ func (c *codec) putReference(buffer encode_buffer, t uint16, v reflect.Value) (r
 			interfaceActualData := v.Elem()
 
 			var tCode uint16
-			tCode, err = c.getType(interfaceActualData.Type())
+			tCode, err = c.global.getType(interfaceActualData.Type())
 			if err != nil {
 				return
 			}
@@ -208,8 +147,8 @@ func (c *codec) putReference(buffer encode_buffer, t uint16, v reflect.Value) (r
 			// put type of referenced object
 			buffer.PutUint16(tCode)
 
-			// allocated size in references for actual data
-			allocate, _ := c.getTypeSize(tCode)
+			// allocated size in references_writer for actual data
+			allocate, _ := c.global.getTypeSize(tCode)
 			c.ref.buff.PutUint16(uint16(allocate))
 
 			// use allocated data
@@ -220,8 +159,8 @@ func (c *codec) putReference(buffer encode_buffer, t uint16, v reflect.Value) (r
 
 			// [element type;2b][key type;2b][reference id; 2b] ... [name len;N;1b;][name bytes;Nb][fieldData;Xb]
 
-			typeOfMap, err := c.getType(v.Type().Elem())
-			typeOfMapKey, err := c.getType(v.Type().Key())
+			typeOfMap, err := c.global.getType(v.Type().Elem())
+			typeOfMapKey, err := c.global.getType(v.Type().Key())
 
 			if err != nil {
 				return 0, err

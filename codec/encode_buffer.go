@@ -2,7 +2,6 @@ package codec
 
 import (
 	"encoding/binary"
-	"fmt"
 	"math"
 )
 
@@ -96,10 +95,6 @@ func (this encode_buffer) Write(p []byte) (n int, err error) {
 
 	if oldl != n {
 		panic("holly shit!")
-	}
-
-	if n > 100 {
-		fmt.Printf(" written holy shit of %d bytes \n", n)
 	}
 
 	this.pos += n

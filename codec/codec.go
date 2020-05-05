@@ -1,7 +1,6 @@
 package codec
 
 import (
-	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -17,72 +16,30 @@ type codec struct {
 	types      map[uint16]*structDefinition
 	order      binary.ByteOrder
 	typeMap    map[string]uint16
-
-	// state
-	mainBuffer encode_buffer
-	ref        *references
-	usedTypes  *DynamicArray
-
-	encodeBuffer    *bytes.Buffer
-	structureBuffer encode_buffer
-
-	decodeBuffer *decode_buffer
-
-	dataBuffer struct {
-		byte       uint8
-		int32val   int32
-		float32val float32
-		float64val float64
-		uint16val  uint16
-		nameReader [255]byte
-	}
 }
 
-func NewCodec() (*codec, error) {
+func (c *codec) get_free_ebuffer(initialSize int) encode_buffer {
+	return NewEncodeBuffer(initialSize, c.order)
+}
+
+func (c *codec) get_free_dbuffer() *decode_buffer {
+	return NewDecodeBuffer(c.order)
+}
+
+func NewCodec(order binary.ByteOrder) (*codec, error) {
 	result := &codec{}
 
 	// in order to not interfer with internal types
 
 	result.typesCount = 27
 	result.types = make(map[uint16]*structDefinition)
-	result.order = binary.BigEndian
+	result.order = order
 	result.typeMap = make(map[string]uint16)
-
-	// state
-
-	// main buffer and pushed one
-	result.mainBuffer = NewEncodeBuffer(512, result.order)
-	result.encodeBuffer = new(bytes.Buffer)
-
-	//
-	result.decodeBuffer = NewDecodeBuffer(result.order)
-
-	//
-	result.usedTypes = NewDArray(10)
-	result.structureBuffer = NewEncodeBuffer(256, result.order)
-
-	var err error
-	result.ref, err = NewReferencesHandler(16, result.order)
-	if err != nil {
-		return nil, err
-	}
 
 	return result, nil
 }
 
-func (c *codec) useType(t uint16) {
-	c.usedTypes.Push(t)
-}
-
-func (c *codec) reset() {
-	c.usedTypes.Clear()
-	c.mainBuffer.Reset()
-	c.ref.Reset()
-	c.encodeBuffer.Reset()
-	c.structureBuffer.Reset()
-}
-
-func (c *codec) cacheReflectionData(typeId uint16, t reflect.Type) error {
+func (c codec) cacheReflectionData(typeId uint16, t reflect.Type) error {
 	tData, ok := c.types[typeId]
 	if !ok {
 		return errors.New("unable to found a type declaration in codec")
@@ -119,7 +76,7 @@ func unrollPrt(p reflect.Type) reflect.Type {
 
 	return p
 }
-func (c *codec) getType(p reflect.Type) (uint16, error) {
+func (c codec) getType(p reflect.Type) (uint16, error) {
 
 	p = unrollPrt(p)
 
@@ -149,7 +106,7 @@ func (c *codec) getType(p reflect.Type) (uint16, error) {
 	}
 }
 
-func (c *codec) getTypeSize(t uint16) (int, error) {
+func (c codec) getTypeSize(t uint16) (int, error) {
 
 	if isArrayType(t) {
 		return 2, nil
@@ -182,85 +139,4 @@ func (c *codec) getTypeSize(t uint16) (int, error) {
 			return 0, fmt.Errorf("Unable to get a type length for type %s: %d", reflect.Kind(t).String(), t)
 		}
 	}
-}
-
-func (c *codec) readArrayElement(buffer *decode_buffer, elementType uint16, out reflect.Value) error {
-
-	buffer.ReadUint16(&c.dataBuffer.uint16val)
-	arrayData, length, err := c.ref.Reader.Get(uint64(c.dataBuffer.uint16val))
-	if err != nil {
-		return err
-	}
-
-	typeSize, err := c.getTypeSize(elementType)
-	if err != nil {
-		return err
-	}
-
-	var items int = int(length) / typeSize
-
-	// check if out is not a slice already
-	arrayResult := reflect.MakeSlice(out.Type(), items, items)
-
-	fakeField := codecStructField{}
-	fakeField.Type = elementType
-
-	curBuf := buffer.InitBranch(arrayData)
-
-	for i := 0; i < items; i++ {
-		c.readFieldData(&curBuf, fakeField, arrayResult.Index(i))
-	}
-
-	out.Set(arrayResult)
-
-	return nil
-}
-
-func (c *codec) readMapField(buffer *decode_buffer, interfaceElemType uint16, keyType uint16, refBytes []byte, out reflect.Value) error {
-
-	dataLen := len(refBytes)
-
-	newMap := reflect.MakeMap(out.Type())
-
-	// type of interface element
-	elemSize, err := c.getTypeSize(interfaceElemType)
-	if err != nil {
-		return err
-	}
-
-	keySize, err := c.getTypeSize(keyType)
-	elemSize += keySize
-
-	elems := dataLen / elemSize
-
-	values := reflect.MakeSlice(reflect.SliceOf(out.Type().Elem()), elems, elems)
-	keys := reflect.MakeSlice(reflect.SliceOf(out.Type().Key()), elems, elems)
-
-	fakeKeyField := codecStructField{}
-	fakeKeyField.Type = keyType
-
-	subBuffer := buffer.InitBranch(refBytes)
-
-	for i := 0; i < elems; i++ {
-		// read key
-		fakeKeyField.Type = keyType
-		err := c.readFieldData(&subBuffer, fakeKeyField, keys.Index(i))
-
-		if err != nil {
-			return err
-		}
-
-		// read value
-		fakeKeyField.Type = interfaceElemType
-		err = c.readFieldData(&subBuffer, fakeKeyField, values.Index(i))
-		if err != nil {
-			return err
-		}
-
-		newMap.SetMapIndex(keys.Index(i), values.Index(i))
-	}
-
-	out.Set(newMap)
-
-	return err
 }
