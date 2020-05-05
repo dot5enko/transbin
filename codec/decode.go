@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"github.com/dot5enko/transbin/utils"
 	"reflect"
+	"strings"
+	"unsafe"
 )
 
 func (c *codec) readStructFieldData() (sf codecStructField, err error) {
@@ -172,6 +174,17 @@ func (c *codec) readSimpleFieldData(t uint16, out reflect.Value) error {
 	tmpVal := reflect.Indirect(out)
 
 	switch reflect.Kind(t) {
+	case reflect.Int64:
+		c.decodeBuffer.ReadInt64(&c.dataBuffer.int64val)
+		if tmpVal.CanSet() {
+			if tmpVal.Kind() == reflect.Interface {
+				tmpVal.Set(reflect.ValueOf(c.dataBuffer.int64val))
+			} else {
+				tmpVal.SetInt(c.dataBuffer.int64val)
+			}
+		} else {
+			return utils.Error("unable to set int64 value of unaccessable field")
+		}
 	case reflect.Int, reflect.Int32:
 		err := c.decodeBuffer.ReadInt32(&c.dataBuffer.int32val)
 
@@ -216,10 +229,10 @@ func (c *codec) readSimpleFieldData(t uint16, out reflect.Value) error {
 				tmpVal.SetFloat(float64(c.dataBuffer.float32val))
 			}
 		} else {
-			return errors.New("unable to set float32 value of unaccessable field")
+			return utils.Error("unable to set float32 value of unaccessable field")
 		}
 	default:
-		return errors.New(fmt.Sprintf("Unable to decode type %", t))
+		return utils.Error("Unable to decode type %s", reflect.Kind(t))
 	}
 
 	return nil
@@ -286,6 +299,44 @@ func (c *codec) readReferenceFieldData(t uint16, out reflect.Value) error {
 func (c *codec) readComplexFieldData(t uint16, out reflect.Value) (err error) {
 
 	refValue := reflect.Indirect(out)
+
+	strName := out.Type().String()
+
+	if !strings.Contains(strName, "TestStruct") {
+
+		actualSize := c.types[t].Size
+		//desiredSize := int(out.Type().Size())
+
+		if false {//actualSize == desiredSize {
+
+			bufferStart := unsafe.Pointer(&c.decodeBuffer.allocator.data[c.decodeBuffer.pos])
+			valRef := reflect.NewAt(out.Type(), bufferStart)
+
+			//fmt.Printf(" --- struct %s\n", out.Type().String())
+			//
+			//// fix references
+			//el := valRef.Elem()
+			//nFields := el.NumField()
+			//for i := 0; i < nFields; i++ {
+			//	curField := el.Field(i)
+			//	switch curField.Type().Kind() {
+			//	case reflect.String, reflect.Slice, reflect.Map, reflect.Ptr:
+			//		curField.Set(reflect.ValueOf(nil))
+			//	case reflect.Struct:
+			//		curField.Set(reflect.Zero(curField.Type()))
+			//	default:
+			//		fmt.Printf(" do not fix %10s : %s field\n", el.Type().Field(i).Name, curField.Type().Kind())
+			//	}
+			//}
+			//fmt.Printf(" got a value of internal type %d[%d] => %#v\n", t, 0, valRef.Elem())
+			out.Set(valRef.Elem())
+			c.decodeBuffer.Next(actualSize)
+			return
+		} else {
+			//fmt.Printf("size for struct %s mismatched : desired %d, actual %d\n",strName,desiredSize,actualSize)
+		}
+
+	}
 
 	if refValue.Kind() != reflect.Struct {
 		return utils.Error("cannot decode data to %s", refValue.Kind().String())

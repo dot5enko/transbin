@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/dot5enko/transbin/codec"
+	"reflect"
 	"testing"
 	"time"
+	"unsafe"
 )
 
 type ProductVal struct {
@@ -14,12 +16,13 @@ type ProductVal struct {
 }
 
 type MapValStruct struct {
-	Int  int
-	Name string
+	Int  int32
+	Int2 float32
+	Name int64
 }
 
 type NStruct struct {
-	Nint    int
+	Nint    int32
 	Nstring int
 	N3      int
 	N5      int
@@ -54,8 +57,9 @@ func main() {
 	toEncode.StrVal = "holaAmigo grande!"
 	//toEncode.Ids = []int32{99, 88, 77, 66, 55, 44, 33, 22, 11}
 
-	toEncode.MapVal.Int = 5
-	toEncode.MapVal.Name = "serhii"
+	toEncode.MapVal.Int = 1995
+	toEncode.MapVal.Int2 = 499.95
+	toEncode.MapVal.Name = 1234567899876543
 
 	ids := 10
 	toEncode.NestedStruct = make([]NStruct, ids)
@@ -91,7 +95,23 @@ func main() {
 
 	fmt.Printf("Got encoded data %d bytes length\n", len(encodedResult))
 
-	////decodedBack := make(map[string]interface{})
+	mvs := reflect.ValueOf(MapValStruct{})
+
+	nf := mvs.NumField()
+	for i := 0; i < nf; i++ {
+		fmt.Printf(" -- field %20s offset %d\n", mvs.Field(i).String(), mvs.Type().Field(i).Offset)
+	}
+	fmt.Printf("mvs type size :%d\n", mvs.Type().FieldAlign())
+
+	fmt.Printf("real size of MapValStruct : %d aligned %d\n", unsafe.Sizeof(mvs), unsafe.Alignof(mvs))
+	fmt.Printf("real size of int : %d\n", unsafe.Sizeof(int(0)))
+	fmt.Printf("real size of int32 : %d\n", unsafe.Sizeof(int32(0)))
+	fmt.Printf("real size of int64 : %d\n", unsafe.Sizeof(int64(0)))
+	fmt.Printf("real size of *int : %d\n", unsafe.Sizeof(new(int)))
+	fmt.Printf("real size of string : %d\n", unsafe.Sizeof(string("hola amigo grande, this is me")))
+	fmt.Printf("real size of map : %d\n", unsafe.Sizeof(make(map[string]string)))
+
+	//decodedBack := make(map[string]interface{})
 	//decodedBack := TestStruct{}
 	////codec.Reporting = true
 	//err = c.Decode(&decodedBack, encodedResult)

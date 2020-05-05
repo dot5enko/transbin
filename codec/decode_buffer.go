@@ -49,7 +49,6 @@ func (this *decode_buffer) PopState() {
 	this.allocator.size = prevState.size
 }
 
-
 func (this *decode_buffer) Init(b []byte) {
 	this.allocator = &buff_allocator{}
 	this.allocator.data = b
@@ -99,6 +98,13 @@ func (this *decode_buffer) ReadUint16(dest *uint16) (err error) {
 func (this *decode_buffer) ReadInt32(data *int32) error {
 	*data = int32(this.order.Uint32(this.allocator.data[this.pos:]))
 	this.pos += 4
+
+	return nil
+}
+
+func (this *decode_buffer) ReadInt64(data *int64) error {
+	*data = int64(this.order.Uint64(this.allocator.data[this.pos:]))
+	this.pos += 8
 
 	return nil
 }

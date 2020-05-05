@@ -36,11 +36,10 @@ func (this *encode_buffer) ReadByte() (n byte, err error) {
 	return
 }
 
-
 func (this *encode_buffer) grow(atLeast int) {
 
-	newSize := this.allocator.size*2
-	if (atLeast > newSize) {
+	newSize := this.allocator.size * 2
+	if atLeast > newSize {
 		newSize += atLeast
 	}
 
@@ -68,12 +67,12 @@ func (this *encode_buffer) Write(p []byte) (n int, err error) {
 
 	n = copy(this.allocator.data[this.pos:], p)
 
-	if (oldl != n) {
+	if oldl != n {
 		panic("holly shit!")
 	}
 
-	if (n > 100) {
-		fmt.Printf(" written holy shit of %d bytes \n",n)
+	if n > 100 {
+		fmt.Printf(" written holy shit of %d bytes \n", n)
 	}
 
 	this.pos += n
@@ -94,6 +93,12 @@ func (this *encode_buffer) PutInt32(v int32) {
 	this.tryGrow(4)
 	this.order.PutUint32(this.allocator.data[this.pos:], uint32(v))
 	this.pos += 4
+}
+
+func (this *encode_buffer) PutInt64(v int64) {
+	this.tryGrow(8)
+	this.order.PutUint64(this.allocator.data[this.pos:], uint64(v))
+	this.pos += 8
 }
 
 func (this *encode_buffer) PutFloat32(v float32) {

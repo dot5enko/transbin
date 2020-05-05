@@ -114,6 +114,8 @@ func (c *codec) writeSimpleFieldData(buffer *encode_buffer, v reflect.Value) err
 		buffer.PutFloat32(v.Interface().(float32))
 	case reflect.Float64:
 		buffer.PutFloat64(v.Interface().(float64))
+	case reflect.Int64:
+		buffer.PutInt64(v.Interface().(int64))
 	default:
 		return utils.Error("no handler for writing simple type %s", v.Kind().String())
 	}
@@ -142,24 +144,15 @@ func (c *codec) writeFieldData(buffer *encode_buffer, field codecStructField, v 
 
 	if isArrayType(field.Type) {
 		err = c.writeReferenceFieldData(buffer, field.Type, v)
-		if err != nil {
-			return
-		}
 	} else {
 		if field.Type > internalTypesCount {
 			err = c.writeComplexType(buffer, field.Type, v)
-			if err != nil {
-				return
-			}
 		} else {
 			switch reflect.Kind(field.Type) {
 			case reflect.String, reflect.Map, reflect.Interface:
 				err = c.writeReferenceFieldData(buffer, field.Type, v)
-				if err != nil {
-					return
-				}
 			default:
-				c.writeSimpleFieldData(buffer, v)
+				err = c.writeSimpleFieldData(buffer, v)
 			}
 		}
 	}

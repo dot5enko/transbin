@@ -31,11 +31,14 @@ type codec struct {
 	dataBuffer struct {
 		byte       uint8
 		int32val   int32
+		int64val   int64
 		float32val float32
 		float64val float64
 		uint16val  uint16
 		nameReader [255]byte
 	}
+	decodeRaw    interface{}
+	decodeUnsafe uintptr
 }
 
 func NewCodec() (*codec, error) {
@@ -45,7 +48,7 @@ func NewCodec() (*codec, error) {
 
 	result.typesCount = 27
 	result.types = make(map[uint16]*structDefinition)
-	result.order = binary.BigEndian
+	result.order = binary.LittleEndian
 	result.typeMap = make(map[string]uint16)
 
 	// state
