@@ -273,7 +273,9 @@ func (c *codec) readReferenceFieldData(buffer *decode_buffer, t uint16, out refl
 		fakeField := codecStructField{}
 		fakeField.Type = interfaceType
 
-		c.readFieldData(buffer.InitBranch(refBytes), fakeField, out)
+		refBuffer := buffer.InitBranch(refBytes)
+
+		c.readFieldData(&refBuffer, fakeField, out)
 	default:
 		return utils.Error("Unable to decode referenced type: %s\n", reflect.Kind(t).String())
 	}

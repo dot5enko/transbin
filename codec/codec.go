@@ -205,8 +205,10 @@ func (c *codec) readArrayElement(buffer *decode_buffer, elementType uint16, out 
 	fakeField := codecStructField{}
 	fakeField.Type = elementType
 
+	curBuf := buffer.InitBranch(arrayData)
+
 	for i := 0; i < items; i++ {
-		c.readFieldData(buffer.InitBranch(arrayData), fakeField, arrayResult.Index(i))
+		c.readFieldData(&curBuf, fakeField, arrayResult.Index(i))
 	}
 
 	out.Set(arrayResult)
@@ -242,7 +244,7 @@ func (c *codec) readMapField(buffer *decode_buffer, interfaceElemType uint16, ke
 	for i := 0; i < elems; i++ {
 		// read key
 		fakeKeyField.Type = keyType
-		err := c.readFieldData(subBuffer, fakeKeyField, keys.Index(i))
+		err := c.readFieldData(&subBuffer, fakeKeyField, keys.Index(i))
 
 		if err != nil {
 			return err
@@ -250,7 +252,7 @@ func (c *codec) readMapField(buffer *decode_buffer, interfaceElemType uint16, ke
 
 		// read value
 		fakeKeyField.Type = interfaceElemType
-		err = c.readFieldData(subBuffer, fakeKeyField, values.Index(i))
+		err = c.readFieldData(&subBuffer, fakeKeyField, values.Index(i))
 		if err != nil {
 			return err
 		}

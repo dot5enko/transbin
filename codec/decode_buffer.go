@@ -33,10 +33,10 @@ func NewDecodeBuffer(order binary.ByteOrder) *decode_buffer {
 func (this *decode_buffer) Reset() {
 }
 
-func (this decode_buffer) InitBranch(data []byte) *decode_buffer {
+func (this decode_buffer) InitBranch(data []byte) decode_buffer {
 
 	this.Init(data)
-	return &this
+	return this
 }
 
 func (this *decode_buffer) Init(b []byte) {

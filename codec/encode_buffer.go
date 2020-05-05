@@ -14,11 +14,11 @@ type encode_buffer struct {
 func NewEncodeBuffer(size int, order binary.ByteOrder) *encode_buffer {
 
 	result := &encode_buffer{}
+	result.buff_allocator = &buff_allocator{}
 
-	result.allocator = &buff_allocator{}
-	result.allocator.data = make([]byte, size)
+	result.data = make([]byte, size)
 	result.pos = 0
-	result.allocator.size = size
+	result.size = size
 	result.order = order
 
 	return result
