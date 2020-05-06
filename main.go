@@ -114,9 +114,8 @@ func main() {
 	fmt.Printf("Got a result : %s\n", jb)
 
 	time.Sleep(time.Microsecond)
-	//return
 
-	////return
+	return
 	PrintBenchmark("binary full encode", testing.Benchmark(func(b *testing.B) {
 
 		for i := 0; i < b.N; i++ {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/dot5enko/transbin/utils"
 	"reflect"
+	"runtime"
 )
 
 type decode_context struct {
@@ -259,6 +260,8 @@ func (c *decode_context) Decode(out interface{}, input []byte) error {
 
 func (c *decode_context) readFieldData(buffer *decode_buffer, field codecStructField, out reflect.Value) error {
 
+
+
 	if isArrayType(field.Type) {
 		return c.readArrayElement(buffer, getArrayElementType(field.Type), out)
 	} else {
@@ -274,6 +277,7 @@ func (c *decode_context) readFieldData(buffer *decode_buffer, field codecStructF
 
 		}
 	}
+
 }
 
 func (c *decode_context) readSimpleFieldData(buffer *decode_buffer, t uint16, out reflect.Value) error {
@@ -282,6 +286,8 @@ func (c *decode_context) readSimpleFieldData(buffer *decode_buffer, t uint16, ou
 
 	switch reflect.Kind(t) {
 	case reflect.Int, reflect.Int32:
+
+
 		err := buffer.ReadInt32(&c.dataBuffer.int32val)
 
 		if err != nil {
@@ -289,17 +295,21 @@ func (c *decode_context) readSimpleFieldData(buffer *decode_buffer, t uint16, ou
 		}
 
 		if tmpVal.CanSet() {
-
 			val := int64(c.dataBuffer.int32val)
 
 			if tmpVal.Kind() == reflect.Interface {
 				tmpVal.Set(reflect.ValueOf(val))
 			} else {
+
+
 				tmpVal.SetInt(val)
+
 			}
 		} else {
 			return utils.Error("Cant set value on field of type %d\n", t)
 		}
+
+
 	case reflect.Float64:
 		buffer.ReadFloat64(&c.dataBuffer.float64val)
 		if tmpVal.CanSet() {
@@ -337,6 +347,8 @@ func (c *decode_context) readSimpleFieldData(buffer *decode_buffer, t uint16, ou
 
 func (c *decode_context) readReferenceFieldData(buffer *decode_buffer, t uint16, out reflect.Value) error {
 
+
+
 	switch reflect.Kind(t) {
 	case reflect.String:
 		buffer.ReadUint16(&c.dataBuffer.uint16val)
@@ -349,7 +361,17 @@ func (c *decode_context) readReferenceFieldData(buffer *decode_buffer, t uint16,
 		if out.Kind() == reflect.Interface {
 			out.Set(reflect.ValueOf(string(refBytes)))
 		} else {
+
+			runtime.ReadMemStats(&curms)
 			out.SetString(string(refBytes))
+
+			oldMallocs := curms.Mallocs
+			runtime.ReadMemStats(&curms)
+			if oldMallocs != curms.Mallocs {
+				refsC += (curms.Mallocs - oldMallocs)
+				fmt.Printf(" -- put simple field %d mallocs +%d when adding type %s\n", refsC, curms.Mallocs-oldMallocs, out.Type().String())
+			}
+
 		}
 	case reflect.Map:
 

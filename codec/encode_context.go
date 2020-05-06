@@ -144,7 +144,7 @@ func (c *encode_context) encodeInternal(obj interface{}, full bool) ([]byte, err
 }
 
 func (c encode_context) writeSimpleFieldData(buffer *encode_buffer, v reflect.Value) error {
-		//runtime.ReadMemStats(&curms)
+
 
 
 	switch v.Kind() {
@@ -159,13 +159,7 @@ func (c encode_context) writeSimpleFieldData(buffer *encode_buffer, v reflect.Va
 	default:
 		return utils.Error("no handler for writing simple type %s", v.Kind().String())
 	}
-	//oldMallocs := curms.Mallocs
-	//runtime.ReadMemStats(&curms)
-	//
-	//if oldMallocs != curms.Mallocs {
-	//	refsC += (curms.Mallocs - oldMallocs)
-	//	fmt.Printf(" -- put simple field %d mallocs +%d when adding type %s\n", refsC, curms.Mallocs-oldMallocs, v.Type().String())
-	//}
+
 	return nil
 }
 
